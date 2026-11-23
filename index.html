@@ -1812,9 +1812,15 @@ function handleEvent(e, S) {
 
 // ---------- client-side prediction (remote players only) ----------
 const PRED = { on: false, p: null, seat: -1, ghost: new Set(), bombsKey: '' };
+// sync mode: everyone is on a fast direct link, so nobody predicts. Every player sees exactly what the host
+// simulates (no rollback), and the host's own input is held back by the same round trip so it is fair.
+function syncMode() {
+  if (!IS_WEB || app.mode !== 'online' || !app.nroom || !app.nroom.links) return false;
+  const lk = app.nroom.links(); return lk.total > 0 && lk.ready === lk.total && (app.nroom.linkMs() || 0) < 220;
+}
 function predictStep(S, dt) {
   const ms = mySeat(S);
-  PRED.on = app.mode === 'online' && !app.isHost && ms >= 0 && !!S && S.ph === 'play' && !S.pz;
+  PRED.on = app.mode === 'online' && !app.isHost && ms >= 0 && !!S && S.ph === 'play' && !S.pz && !syncMode();
   if (!PRED.on) { PRED.p = null; PRED.seat = -1; return; }
   const sp = S.p[ms]; if (!sp) { PRED.on = false; return; }
   const sx = sp[0] / 100, sy = sp[1] / 100;
@@ -2319,7 +2325,7 @@ function updateHud() {
     nt.style.display = '';
     const lms = app.nroom.linkMs ? app.nroom.linkMs() : 0;
     if (!lk.total) { nt.textContent = '👤 Chỉ có mình bạn'; nt.style.background = '#3a4660'; nt.title = 'Chưa có ai khác trong phòng'; }
-    else if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
+    else if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : '') + (syncMode() ? ' · ⚖️' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
     else if (lk.ready) { nt.textContent = `⚡ ${lk.ready}/${lk.total} trực tiếp`; nt.style.background = '#5a6a1a'; nt.title = 'Một số người đi qua máy chủ trung chuyển'; }
     else if (ms2 || 1) { nt.textContent = '☁️ ' + (ms2 || '…') + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
   }
@@ -2791,6 +2797,15 @@ function hostUnseat(k) {
 }
 function sameNames(g) { return g.players.every((p, i) => (p ? p.name + '|' + p.trait : null) === (host.seats[i].type === 'empty' ? null : host.seats[i].name + '|' + seatTrait(i))); }
 
+const selfQ = [];
+function hostSelfInput() {
+  const now = performance.now(), cur = { dx: inp.dx, dy: inp.dy, b: inp.b, nd: inp.nd };
+  selfQ.push({ t: now, v: cur });
+  const remoteHumans = host.seats.some(s => s.type === 'human' && s.peer && s.peer !== app.myPeer);
+  const delay = remoteHumans && syncMode() ? Math.min(180, (app.nroom.linkMs() || 0) + 25) : 0;
+  while (selfQ.length > 1 && selfQ[1].t <= now - delay) selfQ.shift();
+  return delay ? selfQ[0].v : cur;
+}
 function hostTick(dt) {
   const g = host.g; if (!g) return;
   hostSeatMaintenance();
@@ -2801,7 +2816,7 @@ function hostTick(dt) {
     const seat = host.seats[i];
     if (p.bot || seat.type !== 'human') { inputs[i] = SIM.botThink(g, p); continue; }
     let src = null;
-    if (seat.peer === app.myPeer) src = inp;
+    if (seat.peer === app.myPeer) src = hostSelfInput();
     else { const pe = pm.get(seat.peer); src = pe?.presence?.inp; }
     src = src || { dx: 0, dy: 0, b: 0, nd: 0 };
     const key = i + ':' + seat.peer, li = host.lastIn[key];
@@ -2831,7 +2846,7 @@ function hostTick(dt) {
   pumpComments();
   setState(snap);
   snap.k = host.tick;
-  if (app.mode === 'online' && app.nroom && host.tick % 2 === 0 && PRES_TX) {
+  if (app.mode === 'online' && app.nroom && (host.tick % 2 === 0 || syncMode()) && PRES_TX) {
     // the map rarely changes: only send it when it does (and every ~2 s for late joiners)
     const wire = { ...snap };
     if (snap.m === host.lastM && host.tick - host.lastMTick < 60 && host.lastMrk === snap.rk) delete wire.m;

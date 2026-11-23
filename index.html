@@ -608,6 +608,20 @@ const SIM = (() => {
     if (Math.abs(off) > 1e-4) p[pr] -= Math.sign(off) * Math.min(dist, Math.abs(off)); // re-center
   }
 
+  // remote players own their movement: take the position they report if it is plausible
+  function acceptPos(g, p, inp) {
+    const x = +inp.pos.x, y = +inp.pos.y;
+    if (!isFinite(x) || !isFinite(y) || x < 0.5 || y < 0.5 || x > W - 1.5 || y > H - 1.5) return false;
+    const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~'; };
+    if (Math.hypot(x - p.x, y - p.y) > 1.6) return false; // e.g. we just teleported them: wait for their client to catch up
+    if (blocked(Math.round(x), Math.round(y)) || blocked(Math.round((x + p.x) / 2), Math.round((y + p.y) / 2))) return false;
+    const moved = Math.abs(x - p.x) + Math.abs(y - p.y);
+    p.x = x; p.y = y;
+    if (typeof inp.dir === 'number' && inp.dir >= 0 && inp.dir <= 3) p.dir = inp.dir;
+    p.moving = (moved > 1e-3 || inp.dx || inp.dy) ? 1 : 0;
+    return true;
+  }
+
   function movePlayer(g, p, dx, dy, dt) {
     if (!dx && !dy) { p.moving = 0; return; }
     const speed = p.st === 1 ? TRAP_SPEED : BASE_SPEED + effSpd(p) * SPEED_STEP;
@@ -842,7 +856,7 @@ const SIM = (() => {
           continue;
         }
       }
-      movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
+      if (!(inp.pos && p.st === 0 && acceptPos(g, p, inp))) movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
       if (inp.bomb) placeBomb(g, p, inp.cell);
       for (const id of [...p.ghost]) {
         const b = g.bombs.find(bb => bb.id === id);
@@ -1786,11 +1800,11 @@ function predictStep(S, dt) {
   for (let i = 0; i < W * H; i++) if (bombAt[i] && !P.ghost.has(i) && Math.abs(P.x - i % W) < 0.95 && Math.abs(P.y - ((i / W) | 0)) < 0.95 && !PRED.known?.has(i)) P.ghost.add(i);
   PRED.known = new Set(bombAt.map((b, i) => b ? i : -1).filter(i => i >= 0));
   SIM.predictMove({ map, bombAt }, P, inp.dx, inp.dy, dt);
+  if (performance.now() - (PRED.sentAt || 0) > 33 && Math.abs(P.x - (PRED.sx ?? -9)) + Math.abs(P.y - (PRED.sy ?? -9)) > 0.01) sendInput();
   // reconcile softly with the authoritative position
   const ex = sx - P.x, ey = sy - P.y, err = Math.hypot(ex, ey);
-  if (err > 2.2) { P.x = sx; P.y = sy; }
-  else if (!inp.dx && !inp.dy) { const k = Math.min(1, dt * 5); P.x += ex * k; P.y += ey * k; }
-  else if (err > 1.2) { const k = Math.min(1, dt * 1.5); P.x += ex * k; P.y += ey * k; }
+  PRED.far = err > 1.4 ? (PRED.far || 0) + dt : 0;
+  if (err > 2.2 || PRED.far > 0.6) { P.x = sx; P.y = sy; PRED.far = 0; } // host disagrees for real (teleport, blocked): follow it
 }
 
 // ---------- draw ----------
@@ -2502,8 +2516,16 @@ let inpTimer = 0;
 function sendInput() {
   if (app.mode !== 'online' || app.isHost || !app.nroom) return;
   clearTimeout(inpTimer);
-  app.nroom.presence({ inp: { dx: inp.dx, dy: inp.dy, b: inp.b, nd: inp.nd, bc: inp.bc } }).catch(() => {});
+  const pp = PRED.on && PRED.p ? PRED.p : null;
+  PRED.sentAt = performance.now();
+  if (pp) { PRED.sx = pp.x; PRED.sy = pp.y; }
+  app.nroom.presence({ inp: { dx: inp.dx, dy: inp.dy, b: inp.b, nd: inp.nd, bc: inp.bc, px: pp ? Math.round(pp.x * 100) / 100 : null, py: pp ? Math.round(pp.y * 100) / 100 : null, dr: pp ? pp.dir : null } }).catch(() => {});
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && app.isHost && app.mode === 'online' && host.hiddenAt && Date.now() - host.hiddenAt > 3000) toast('Bạn là host: hạn chế chuyển tab/thoát app khi đang chơi để cả phòng không bị giật', 4000);
+  host.hiddenAt = document.hidden ? Date.now() : 0;
+});
 
 // ---------- pause ----------
 function togglePause() {
@@ -2606,16 +2628,27 @@ function startHosting() {
   if (app.mode === 'solo') { hostSeatMaintenance(); hostNewGame('pick'); }
   clearInterval(host.timer);
   let last = performance.now();
-  host.timer = setInterval(() => {
+  const tick = () => {
     const now = performance.now(); let dt = (now - last) / 1000; last = now;
-    dt = Math.min(dt, 0.25);
-    hostTick(dt);
-  }, 1000 / 30);
+    dt = Math.min(dt, 1);
+    while (dt > 0) { const d = Math.min(dt, 0.05); dt -= d; hostTick(d); } // catch up if the browser throttled us
+  };
+  host.timer = setInterval(tick, 1000 / 30);
+  // background tabs throttle setInterval to ~1/s: a worker's timer keeps the host running at full speed
+  try {
+    if (!host.worker) {
+      const src = 'let t=null;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}';
+      host.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    }
+    host.worker.onmessage = () => { if (document.hidden && app.isHost) tick(); };
+    host.worker.postMessage(1000 / 30);
+  } catch (e) { /* workers unavailable: fall back to setInterval only */ }
   renderHostPanel();
   if (app.nroom) app.nroom.presence({ role: 'host', hs: app.hostSince }).catch(() => {});
 }
 function stopHosting() {
   app.isHost = false; clearInterval(host.timer); host.timer = 0;
+  try { host.worker && host.worker.postMessage(0); } catch (e) { /* ignore */ }
   $('hostPanel').style.display = 'none';
   if (app.nroom) app.nroom.presence({ role: null, hs: null, cm: null, st: null }).catch(() => {});
 }
@@ -2721,7 +2754,9 @@ function hostTick(dt) {
     const key = i + ':' + seat.peer, li = host.lastIn[key];
     const bomb = li ? src.b !== li.b : false, needle = li ? src.nd !== li.nd : false;
     host.lastIn[key] = { b: src.b, nd: src.nd };
-    inputs[i] = { dx: Math.sign(src.dx | 0), dy: Math.sign(src.dy | 0), bomb, needle, cell: seat.peer === app.myPeer ? -1 : (typeof src.bc === 'number' ? src.bc : -1) };
+    const remote = seat.peer !== app.myPeer;
+    inputs[i] = { dx: Math.sign(src.dx | 0), dy: Math.sign(src.dy | 0), bomb, needle, cell: !remote ? -1 : (typeof src.bc === 'number' ? src.bc : -1),
+      pos: remote && typeof src.px === 'number' && typeof src.py === 'number' ? { x: src.px, y: src.py } : null, dir: src.dr };
   }
   if (host.paused && g.phase !== 'lobby') {
     // frozen

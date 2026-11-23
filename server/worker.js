@@ -2,7 +2,7 @@
 const SIM = (() => {
   // map size presets: [width, height, round seconds]
   const SIZES = { normal: [15, 13, 180], medium: [19, 15, 200], large: [23, 17, 230] };
-  let W = 15, H = 13, ROUND_TIME = 180, SPAWNS, PORTALS, RIVER_Y, BRIDGES, SPIRAL, SUDDEN_STEP;
+  let W = 15, H = 13, ROUND_TIME = 180, SPAWNS, PORTALS, RIVER_Y, RIVER_X, BRIDGES, VBRIDGES, SPIRAL, SUDDEN_STEP;
   const BOMB_TIME = 2.6, FLAME_TIME = 0.5, TRAP_TIME = 4.5, COUNT_TIME = 3, END_TIME = 5;
   const KICK_SPEED = 7, THROW_DIST = 3, KILL_PTS = 1, WIN_PTS = 2;
   const DIRS = [[0, 1], [0, -1], [-1, 0], [1, 0]]; // dir 0 down,1 up,2 left,3 right
@@ -13,10 +13,12 @@ const SIM = (() => {
   function setDims(size) {
     const d = SIZES[size] || SIZES.normal;
     W = d[0]; H = d[1]; ROUND_TIME = d[2];
-    SPAWNS = [[1, 1], [W - 2, H - 2], [W - 2, 1], [1, H - 2]];
+    const mx = (W - 1) / 2, my = (H - 1) / 2;
+    // seats 0-3: corners; seats 4-7: one more per quarter (clear of the cross river)
+    SPAWNS = [[1, 1], [W - 2, H - 2], [W - 2, 1], [1, H - 2], [mx - 2, 1], [mx + 2, H - 2], [1, my + 2], [W - 2, my - 2]];
     PORTALS = [[3, 3], [W - 4, 3], [3, H - 4], [W - 4, H - 4]];
-    RIVER_Y = (H - 1) / 2;
-    BRIDGES = [3, W - 4];
+    RIVER_Y = (H - 1) / 2; RIVER_X = (W - 1) / 2;
+    BRIDGES = [3, W - 4]; VBRIDGES = [3, H - 4]; // river map: a cross of water, one bridge on each arm
     SPIRAL = [];
     let x0 = 1, y0 = 1, x1 = W - 2, y1 = H - 2;
     while (x0 <= x1 && y0 <= y1) {
@@ -65,20 +67,22 @@ const SIM = (() => {
       const i = idx(x, y);
       if (x === 0 || y === 0 || x === W - 1 || y === H - 1) map[i] = '#';
       else if (mapId === 'river' && y === RIVER_Y) map[i] = BRIDGES.includes(x) ? '=' : '~';
+      else if (mapId === 'river' && x === RIVER_X) map[i] = VBRIDGES.includes(y) ? '=' : '~';
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';
-      else if (mapId === 'river' && BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) map[i] = '.'; // bridge heads stay open
+      else if (mapId === 'river' && ((BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) || (VBRIDGES.includes(y) && Math.abs(x - RIVER_X) === 1))) map[i] = '.'; // bridge heads stay open
       else { const r = rand(); if (r < 0.62) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < 0.75) map[i] = 'g'; }
     }
-    const players = [];
-    for (let s = 0; s < 4; s++) {
+    const players = [], N = Math.max(2, Math.min(8, (cfg.players || []).length || 4));
+    const pad = a => { const o = (a || []).slice(0, N); while (o.length < N) o.push(0); return o; };
+    for (let s = 0; s < N; s++) {
       const pc = cfg.players[s];
       if (!pc) { players.push(null); continue; }
       players.push({
         seat: s, name: pc.name, bot: !!pc.bot,
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
-        x: SPAWNS[s][0], y: SPAWNS[s][1], dir: s < 2 ? (s === 0 ? 0 : 1) : 0,
+        x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0,
         maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
@@ -87,17 +91,25 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: cfg.npc === false ? [] : mapId === 'storm'
-        ? [{ x: 5, y: 4, tx: 5, ty: 4, next: 7 + rand() * 2, anim: 0 }, { x: W - 6, y: H - 5, tx: W - 6, ty: H - 5, next: 10 + rand() * 2, anim: 0 }]
-        : [{ x: (W - 1) / 2, y: (H - 1) / 2, tx: (W - 1) / 2, ty: (H - 1) / 2, next: 7 + rand() * 2, anim: 0 }],
+      npcs: makeNpcs(cfg, mapId, rand),
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
       bombs: [], bombAt: new Array(W * H).fill(null), bombId: 0,
       players, phase: 'count', t: COUNT_TIME, timeLeft: ROUND_TIME, roundTime: ROUND_TIME, size: SIZES[cfg.size] ? cfg.size : 'normal',
-      events: [], evId: cfg.evId || 0, winner: -1, wins: (cfg.wins || [0, 0, 0, 0]).slice(), score: (cfg.score || [0, 0, 0, 0]).slice(),
+      events: [], evId: cfg.evId || 0, winner: -1, wins: pad(cfg.wins), score: pad(cfg.score),
       endHold: 0,
     };
+  }
+
+  // storm clouds: how many the host asked for (default 1, 2 on the storm map)
+  function makeNpcs(cfg, mapId, rand) {
+    if (cfg.npc === false) return [];
+    let n = typeof cfg.npcN === 'number' && isFinite(cfg.npcN) ? Math.round(cfg.npcN) : (mapId === 'storm' ? 2 : 1);
+    n = Math.max(0, Math.min(10, n));
+    const spots = [[(W - 1) / 2, (H - 1) / 2], [5, 4], [W - 6, H - 5], [W - 6, 4], [5, H - 5], [(W - 1) / 2, 3], [(W - 1) / 2, H - 4], [3, (H - 1) / 2], [W - 4, (H - 1) / 2], [(W - 1) / 2, (H - 1) / 2]];
+    if (n >= 2 && mapId === 'storm') spots.shift(); // keep the old storm layout first
+    return spots.slice(0, n).map(([x, y], i) => ({ x, y, tx: x, ty: y, next: 7 + i * 2.5 + rand() * 2, anim: 0 }));
   }
 
   function ev(g, k, a, b) { g.events.push({ i: ++g.evId, k, a, b }); if (g.events.length > 12) g.events.shift(); }
@@ -675,7 +687,8 @@ const SIM = (() => {
 
 
 // ===== Boom room server: runs the match for everyone (Cloudflare Durable Object) =====
-const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang'];
+const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang', 'Bot Bánh Mì', 'Bot Kem Que', 'Bot Xôi Gà', 'Bot Chè Bưởi'];
+const MAXP = 8, Z = () => new Array(MAXP).fill(0);
 const TEAM_NAME = ['Đội Đỏ-Vàng', 'Đội Xanh-Lá'];
 const TRAIT_KEYS = ['b', 's', 'f', 'n'];
 const PICK_TIME = 10, TICK_MS = 1000 / 30;
@@ -696,8 +709,8 @@ class RoomHost {
     this.room = room; // { peers(): [{id, p, at}], srvSet(patch), feed(text) }
     Object.assign(this, {
       g: null, seats: [0, 1, 2, 3].map(i => ({ type: 'bot', peer: null, name: BOT_NAMES[i] })), seed: (Math.random() * 1e9) | 0, mode: 'ffa', paused: false,
-      size: 'normal', mapSel: 'random', curMap: 'classic', npc: true, auto: true, autoCm: true, autoSeat: true,
-      lastIn: {}, wins: [0, 0, 0, 0], score: [0, 0, 0, 0], botTraits: ['b', 's', 'f', 'n'], occ: ['', '', '', ''], evId: 0,
+      size: 'normal', mapSel: 'random', curMap: 'classic', npcN: 1, auto: true, autoCm: true, autoSeat: true,
+      lastIn: {}, wins: Z(), score: Z(), botTraits: ['b', 's', 'f', 'n', 'b', 's', 'f', 'n'], occ: new Array(MAXP).fill(''), evId: 0,
       rk: (Math.random() * 1e6) | 0, tick: 0, cmQueue: [], cmLast: 0, cmId: 0, seenEv: 0, kicked: new Set(), forced: new Map(),
     });
     this.curMap = this.pickMap();
@@ -712,9 +725,9 @@ class RoomHost {
   }
   playersCfg() { return this.seats.map((s, i) => s.type === 'empty' ? null : { name: s.type === 'bot' ? s.name || BOT_NAMES[i] : s.name, bot: s.type === 'bot', trait: this.seatTrait(i) }); }
   pickMap() { if (this.mapSel !== 'random') return this.mapSel; const o = SIM.MAPS.filter(m => m !== this.curMap); return o[(Math.random() * o.length) | 0]; }
-  create() { const g = SIM.createGame({ seed: this.seed || 1, map: this.curMap, size: this.size, npc: this.npc, mode: this.mode, players: this.playersCfg(), wins: this.wins, score: this.score, evId: this.evId }); g.__size = this.size; return g; }
+  create() { const g = SIM.createGame({ seed: this.seed || 1, map: this.curMap, size: this.size, npc: this.npcN > 0, npcN: this.npcN + (this.curMap === 'storm' ? 1 : 0), mode: this.mode, players: this.playersCfg(), wins: this.wins, score: this.score, evId: this.evId }); g.__size = this.size; return g; }
   newGame(phase) {
-    this.seed = (Math.random() * 1e9) | 0; this.botTraits = [0, 1, 2, 3].map(() => TRAIT_KEYS[(Math.random() * 4) | 0]);
+    this.seed = (Math.random() * 1e9) | 0; this.botTraits = Z().map(() => TRAIT_KEYS[(Math.random() * 4) | 0]);
     this.curMap = this.pickMap(); this.rk++;
     this.g = this.create(); this.g.phase = phase; if (phase === 'pick') this.g.t = PICK_TIME; this.lastIn = {};
   }
@@ -767,20 +780,27 @@ class RoomHost {
       case 'mode': if (['ffa', 'team'].includes(v)) { this.mode = v; if (idle) this.rebuildLobby(); } break;
       case 'size': if (SIM.SIZES[v]) { this.size = v; if (idle) this.rebuildLobby(); } break;
       case 'map': if (v === 'random' || SIM.MAPS.includes(v)) { this.mapSel = v; if (idle) { this.curMap = this.pickMap(); this.rebuildLobby(); } } break;
-      case 'npc': this.npc = !!v; if (idle) this.rebuildLobby(); break;
+      case 'npcN': { const n = Math.round(+v); if (n >= 0 && n <= 10) { this.npcN = n; if (idle) this.rebuildLobby(); } break; }
+      case 'count': {
+        const n = Math.round(+v); if (!(n >= 4 && n <= MAXP) || !(idle || g.phase === 'pick')) break;
+        while (this.seats.length < n) { const i = this.seats.length; this.seats.push({ type: 'bot', peer: null, name: BOT_NAMES[i] }); }
+        while (this.seats.length > n) { const s = this.seats.pop(); if (s.type === 'human' && s.peer) this.kicked.add(s.peer); }
+        if (g.phase === 'pick') this.rebuildPick(g.t, 'pick'); else this.rebuildLobby();
+        break;
+      }
       case 'auto': this.auto = !!v; break;
       case 'autoCm': this.autoCm = !!v; break;
       case 'autoSeat': this.autoSeat = !!v; break;
       case 'start': this.seatMaintenance(); if (this.g.players.some(Boolean)) this.newGame('pick'); break;
       case 'newmap': this.seed = (Math.random() * 1e9) | 0; if (g.phase === 'lobby') { this.curMap = this.pickMap(); this.rebuildLobby(); } else this.newGame('pick'); break;
       case 'stop': this.seed = (Math.random() * 1e9) | 0; this.rk++; this.paused = false; this.rebuildLobby(); break;
-      case 'reset': this.wins = [0, 0, 0, 0]; this.score = [0, 0, 0, 0]; g.wins = [0, 0, 0, 0]; g.score = [0, 0, 0, 0]; break;
+      case 'reset': this.wins = Z(); this.score = Z(); g.wins = g.wins.map(() => 0); g.score = g.score.map(() => 0); break;
       case 'pause': if (g.phase !== 'lobby') { this.paused = !this.paused; this.room.feed(this.paused ? '⏸ Host đã tạm dừng trận' : '▶ Trận đấu tiếp tục'); } break;
       case 'cm': this.comment(v); break;
-      case 'seat': { const i = v && v.i; if (i >= 0 && i < 4 && this.seats[i].type !== 'human') { this.seats[i] = v.type === 'bot' ? { type: 'bot', peer: null, name: BOT_NAMES[i] } : { type: 'empty', peer: null, name: '' }; if (g.phase === 'lobby') this.rebuildLobby(); else if (g.phase === 'pick') this.rebuildPick(g.t, 'pick'); } break; }
+      case 'seat': { const i = v && v.i; if (i >= 0 && i < this.seats.length && this.seats[i].type !== 'human') { this.seats[i] = v.type === 'bot' ? { type: 'bot', peer: null, name: BOT_NAMES[i] } : { type: 'empty', peer: null, name: '' }; if (g.phase === 'lobby') this.rebuildLobby(); else if (g.phase === 'pick') this.rebuildPick(g.t, 'pick'); } break; }
       case 'unseat': { const k = v | 0, s = this.seats[k]; if (s && s.type === 'human') { this.kicked.add(s.peer); this.forced.delete(s.peer); this.seats[k] = { type: 'bot', peer: null, name: BOT_NAMES[k] }; this.applySeat(k); } break; }
       case 'assign': {
-        const peer = v && v.peer, k = v && v.k; const pe = this.peer(peer); if (!pe || !(k >= 0 && k < 4)) break;
+        const peer = v && v.peer, k = v && v.k; const pe = this.peer(peer); if (!pe || !(k >= 0 && k < this.seats.length)) break;
         const from = this.seats.findIndex(s => s.type === 'human' && s.peer === peer); if (from === k) break;
         const target = this.seats[k], name = clean(pe.p?.n, 16) || 'Người chơi';
         if (from >= 0) { this.seats[from] = target.type === 'human' ? target : { type: 'bot', peer: null, name: BOT_NAMES[from] }; this.applySeat(from); }
@@ -795,10 +815,10 @@ class RoomHost {
     let g = this.g;
     this.dims();
     this.seatMaintenance(); g = this.g;
-    const inputs = [null, null, null, null];
-    for (let i = 0; i < 4; i++) {
+    const inputs = g.players.map(() => null);
+    for (let i = 0; i < g.players.length; i++) {
       const p = g.players[i]; if (!p) continue;
-      const seat = this.seats[i];
+      const seat = this.seats[i]; if (!seat) continue;
       if (p.bot || seat.type !== 'human') { inputs[i] = SIM.botThink(g, p); continue; }
       const src = this.peer(seat.peer)?.p?.inp || { dx: 0, dy: 0, b: 0, nd: 0 };
       const key = i + ':' + seat.peer, li = this.lastIn[key];
@@ -810,7 +830,7 @@ class RoomHost {
     else if (g.phase === 'pick') { g.t -= dt; if (g.t <= 0) this.rebuildPick(SIM.COUNT_TIME, 'count'); }
     else SIM.step(g, dt, inputs);
     g = this.g;
-    this.evId = g.evId; this.wins = g.wins.slice(); this.score = g.score.slice();
+    this.evId = g.evId; g.wins.forEach((v, i) => { this.wins[i] = v; }); g.score.forEach((v, i) => { this.score[i] = v; });
     if (g.phase === 'end' && g.t <= 0) {
       if (this.auto) { this.seatMaintenance(); this.newGame('pick'); }
       else { this.seed = (Math.random() * 1e9) | 0; this.curMap = this.pickMap(); this.rebuildLobby(); }
@@ -822,7 +842,7 @@ class RoomHost {
     const g = this.g, snap = SIM.encode(g);
     snap.s = this.seats.map((s, i) => s.type === 'empty' ? 0 : [s.type === 'bot' ? 1 : 2, s.name, s.peer || '', g.players[i]?.trait || '']);
     snap.rk = this.rk; snap.auto = this.auto ? 1 : 0; snap.pz = this.paused ? 1 : 0; snap.k = this.tick;
-    snap.cfg = { mode: this.mode, map: this.mapSel, size: this.size, npc: this.npc ? 1 : 0, auto: this.auto ? 1 : 0, autoCm: this.autoCm ? 1 : 0, autoSeat: this.autoSeat ? 1 : 0 };
+    snap.cfg = { mode: this.mode, map: this.mapSel, size: this.size, npc: this.npcN > 0 ? 1 : 0, npcN: this.npcN, auto: this.auto ? 1 : 0, autoCm: this.autoCm ? 1 : 0, autoSeat: this.autoSeat ? 1 : 0 };
     for (const e of snap.e || []) if (e.i > this.seenEv) { this.seenEv = e.i; if (this.autoCm) this.autoComment(e, snap); }
     if (this.cmQueue.length && Date.now() - this.cmLast > 2600) this.comment(this.cmQueue.shift());
     return snap;

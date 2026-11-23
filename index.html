@@ -2,6 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Boom 2.5D</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -128,6 +131,12 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 #bPause:hover{background:linear-gradient(180deg,#ffe08a,#f0b030)}
 #bPause.paused{background:linear-gradient(180deg,#7ee08a,#2fae6b);color:#062a14}
 #bPause:disabled{opacity:.4}
+#bFull{width:46px;height:46px;padding:0;font-size:24px;border-radius:12px;background:linear-gradient(180deg,#8fd3ff,#3b8fd9);color:#06223d;flex:none;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+#bFull:hover{background:linear-gradient(180deg,#a8ddff,#4c9ee6)}
+#left.many .seat{padding:3px 6px;margin-bottom:3px}
+#left.many .seat .sub{display:none}
+#left.many .seat .its{font-size:11px}
+#left.many .seat .dot{width:22px;height:22px;font-size:11px}
 .pauseov{display:inline-block;background:rgba(10,18,34,.9);border:2px solid #ffd36b;border-radius:20px;padding:16px 30px;pointer-events:auto}
 .pauseov .pt{font-size:54px;font-weight:800;color:#ffe08a;line-height:1.1}
 .pauseov .ps{font-size:17px;color:#dbe8ff;margin-top:4px}
@@ -209,6 +218,9 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   #left .seat .sub{display:none}
   #left .seat .wins{font-size:12px}
   #left .sect,#specs,#stats{display:none}
+  #left.many #seats{flex-wrap:wrap!important}
+  #left.many .seat{flex:1 1 23%}
+  #left.many .seat .its{display:none!important}
   #right{display:none}
   #right.show{display:flex;top:auto;bottom:8px;height:48%;left:8px;right:8px;width:auto;z-index:9}
   #banner{max-width:calc(100% - 16px);min-width:0;bottom:auto;font-size:15px;padding:6px 12px}
@@ -239,6 +251,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   #roleBtns{gap:3px;width:auto;flex-wrap:nowrap;justify-content:flex-end}
   #roleBtns button{padding:3px 7px;font-size:12px}
   #bPause{width:34px;height:34px;font-size:17px;margin-left:0}
+  #bFull{width:34px;height:34px;font-size:17px}
   #bInvite{padding:3px 7px;font-size:12px}
   #left{left:6px;top:50px!important;right:auto;bottom:auto;width:160px;flex-direction:column;padding:4px;gap:3px;max-height:none}
   #seats{flex-direction:column!important;gap:3px!important}
@@ -250,6 +263,12 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   #left .seat .wins{position:static;font-size:11px}
   #left .sect,#specs,#stats{display:none}
   #traitBar{display:none!important}
+  #left.many{gap:1px;padding:3px}
+  #left.many #seats{gap:1px!important}
+  #left.many .seat{padding:0 5px;min-height:0}
+  #left.many .seat .mid .nm{font-size:10.5px;line-height:1.5}
+  #left.many .seat .its{display:none!important}
+  #left.many .seat .wins{font-size:10px}
   #banner{top:50px!important;bottom:auto;max-width:44%;min-width:0;font-size:12.5px;padding:3px 10px}
   #banner .who{font-size:9px}
   #right.show{top:50px;bottom:6px;height:auto;left:auto;right:6px;width:300px}
@@ -284,6 +303,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 
 <div id="top" class="panel">
   <button id="bPause" title="Tạm dừng / tiếp tục (P)">⏸</button>
+  <button id="bFull" title="Toàn màn hình">⛶</button>
   <div id="logo">💦 BOOM 2.5D</div>
   <div id="roomTag"></div>
   <button id="bInvite" style="display:none" title="Copy link mời bạn bè">🔗 Mời</button>
@@ -300,7 +320,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <button id="bHelp" title="Hướng dẫn nút bấm (H)">❓</button>
     <button id="bTts" title="Đọc bình luận bằng giọng nói">🔇</button>
     <button id="chatToggle" style="display:none">💬</button>
-    <button id="bFull" style="display:none" title="Toàn màn hình, xoay ngang">⛶</button>
+
   </div>
 </div>
 
@@ -330,7 +350,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   <div class="row" style="justify-content:space-between"><h3>🎙️ Bảng điều khiển Host</h3><button id="hpClose">✕</button></div>
   <div class="row">
     <span>Bản đồ:</span>
-    <select id="hpMap"><option value="random">🎲 Ngẫu nhiên mỗi ván</option><option value="classic">🌿 Đồng cỏ</option><option value="river">🌊 Sông đôi bờ</option><option value="storm">⛈️ Đỉnh Mây Giông</option><option value="portal">🌀 Cổng không gian</option></select>
+    <select id="hpMap"><option value="random">🎲 Ngẫu nhiên mỗi ván</option><option value="classic">🌿 Đồng cỏ</option><option value="river">🌊 Sông ngã tư</option><option value="storm">⛈️ Đỉnh Mây Giông</option><option value="portal">🌀 Cổng không gian</option></select>
   </div>
   <div class="row">
     <span>Kích thước:</span>
@@ -338,12 +358,18 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   </div>
   <div class="row">
     <span>Chế độ:</span>
-    <select id="hpMode"><option value="ffa">Đấu đơn (mỗi người một phe)</option><option value="team">2 vs 2 (Đỏ+Vàng vs Xanh+Lá)</option></select>
+    <select id="hpMode"><option value="ffa">Đấu đơn (mỗi người một phe)</option><option value="team">Chia 2 đội (ghế lẻ vs ghế chẵn)</option></select>
   </div>
   <div class="row"><label><input type="checkbox" id="hpPlay"> Host cũng vào chơi</label>
     <label><input type="checkbox" id="hpAuto" checked> Tự sang ván mới</label>
     <label><input type="checkbox" id="hpAutoCm" checked> Bình luận tự động</label>
-    <label><input type="checkbox" id="hpNpc" checked> ⛈️ Ông Mây Giông thả bom</label></div>
+  </div>
+  <div class="row">
+    <span>Số người chơi:</span>
+    <select id="hpCount"><option value="4">4 người</option><option value="5">5 người</option><option value="6">6 người</option><option value="7">7 người</option><option value="8">8 người</option></select>
+    <span>⛈️ Số Ông Mây Giông:</span>
+    <input type="number" id="hpNpcN" min="0" max="10" step="1" value="1" inputmode="numeric" style="width:64px" title="0 = tắt. Map Đỉnh Mây Giông tự có thêm 1 ông.">
+  </div>
   <div class="sect">👥 Người trong phòng</div>
   <div id="hpPeople" class="plist"></div>
   <div id="hpPickHint" class="phint"></div>
@@ -429,7 +455,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     </div>
     <div class="hcard">
       <div class="ht">🎙️ Bảng host (⚙️)</div>
-      <div class="hk"><span>Chế độ</span><b>Đấu đơn hoặc 2 vs 2</b></div>
+      <div class="hk"><span>Chế độ</span><b>Đấu đơn hoặc chia 2 đội · 4–8 người</b></div>
       <div class="hk"><span>Kích thước</span><b>Bình thường · Vừa · Siêu lớn</b></div>
       <div class="hk"><span>Ghế</span><b>Bot / Trống (chờ người vào)</b></div>
       <div class="hk"><span>▶ Bắt đầu · 🗺️ Bản đồ mới</span><b>Mở ván, đổi bản đồ</b></div>
@@ -438,8 +464,8 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     </div>
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
-      <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (2 vs 2) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (cổ điển) · 🌊 Sông đôi bờ (chỉ 2 cây cầu qua sông) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host tắt được trong ⚙️).</div>
+      <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (cổ điển) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Phách thần (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -460,7 +486,7 @@ const PHACH_IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAAD
 const SIM = (() => {
   // map size presets: [width, height, round seconds]
   const SIZES = { normal: [15, 13, 180], medium: [19, 15, 200], large: [23, 17, 230] };
-  let W = 15, H = 13, ROUND_TIME = 180, SPAWNS, PORTALS, RIVER_Y, BRIDGES, SPIRAL, SUDDEN_STEP;
+  let W = 15, H = 13, ROUND_TIME = 180, SPAWNS, PORTALS, RIVER_Y, RIVER_X, BRIDGES, VBRIDGES, SPIRAL, SUDDEN_STEP;
   const BOMB_TIME = 2.6, FLAME_TIME = 0.5, TRAP_TIME = 4.5, COUNT_TIME = 3, END_TIME = 5;
   const KICK_SPEED = 7, THROW_DIST = 3, KILL_PTS = 1, WIN_PTS = 2;
   const DIRS = [[0, 1], [0, -1], [-1, 0], [1, 0]]; // dir 0 down,1 up,2 left,3 right
@@ -471,10 +497,12 @@ const SIM = (() => {
   function setDims(size) {
     const d = SIZES[size] || SIZES.normal;
     W = d[0]; H = d[1]; ROUND_TIME = d[2];
-    SPAWNS = [[1, 1], [W - 2, H - 2], [W - 2, 1], [1, H - 2]];
+    const mx = (W - 1) / 2, my = (H - 1) / 2;
+    // seats 0-3: corners; seats 4-7: one more per quarter (clear of the cross river)
+    SPAWNS = [[1, 1], [W - 2, H - 2], [W - 2, 1], [1, H - 2], [mx - 2, 1], [mx + 2, H - 2], [1, my + 2], [W - 2, my - 2]];
     PORTALS = [[3, 3], [W - 4, 3], [3, H - 4], [W - 4, H - 4]];
-    RIVER_Y = (H - 1) / 2;
-    BRIDGES = [3, W - 4];
+    RIVER_Y = (H - 1) / 2; RIVER_X = (W - 1) / 2;
+    BRIDGES = [3, W - 4]; VBRIDGES = [3, H - 4]; // river map: a cross of water, one bridge on each arm
     SPIRAL = [];
     let x0 = 1, y0 = 1, x1 = W - 2, y1 = H - 2;
     while (x0 <= x1 && y0 <= y1) {
@@ -523,20 +551,22 @@ const SIM = (() => {
       const i = idx(x, y);
       if (x === 0 || y === 0 || x === W - 1 || y === H - 1) map[i] = '#';
       else if (mapId === 'river' && y === RIVER_Y) map[i] = BRIDGES.includes(x) ? '=' : '~';
+      else if (mapId === 'river' && x === RIVER_X) map[i] = VBRIDGES.includes(y) ? '=' : '~';
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';
-      else if (mapId === 'river' && BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) map[i] = '.'; // bridge heads stay open
+      else if (mapId === 'river' && ((BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) || (VBRIDGES.includes(y) && Math.abs(x - RIVER_X) === 1))) map[i] = '.'; // bridge heads stay open
       else { const r = rand(); if (r < 0.62) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < 0.75) map[i] = 'g'; }
     }
-    const players = [];
-    for (let s = 0; s < 4; s++) {
+    const players = [], N = Math.max(2, Math.min(8, (cfg.players || []).length || 4));
+    const pad = a => { const o = (a || []).slice(0, N); while (o.length < N) o.push(0); return o; };
+    for (let s = 0; s < N; s++) {
       const pc = cfg.players[s];
       if (!pc) { players.push(null); continue; }
       players.push({
         seat: s, name: pc.name, bot: !!pc.bot,
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
-        x: SPAWNS[s][0], y: SPAWNS[s][1], dir: s < 2 ? (s === 0 ? 0 : 1) : 0,
+        x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0,
         maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
@@ -545,17 +575,25 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: cfg.npc === false ? [] : mapId === 'storm'
-        ? [{ x: 5, y: 4, tx: 5, ty: 4, next: 7 + rand() * 2, anim: 0 }, { x: W - 6, y: H - 5, tx: W - 6, ty: H - 5, next: 10 + rand() * 2, anim: 0 }]
-        : [{ x: (W - 1) / 2, y: (H - 1) / 2, tx: (W - 1) / 2, ty: (H - 1) / 2, next: 7 + rand() * 2, anim: 0 }],
+      npcs: makeNpcs(cfg, mapId, rand),
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
       bombs: [], bombAt: new Array(W * H).fill(null), bombId: 0,
       players, phase: 'count', t: COUNT_TIME, timeLeft: ROUND_TIME, roundTime: ROUND_TIME, size: SIZES[cfg.size] ? cfg.size : 'normal',
-      events: [], evId: cfg.evId || 0, winner: -1, wins: (cfg.wins || [0, 0, 0, 0]).slice(), score: (cfg.score || [0, 0, 0, 0]).slice(),
+      events: [], evId: cfg.evId || 0, winner: -1, wins: pad(cfg.wins), score: pad(cfg.score),
       endHold: 0,
     };
+  }
+
+  // storm clouds: how many the host asked for (default 1, 2 on the storm map)
+  function makeNpcs(cfg, mapId, rand) {
+    if (cfg.npc === false) return [];
+    let n = typeof cfg.npcN === 'number' && isFinite(cfg.npcN) ? Math.round(cfg.npcN) : (mapId === 'storm' ? 2 : 1);
+    n = Math.max(0, Math.min(10, n));
+    const spots = [[(W - 1) / 2, (H - 1) / 2], [5, 4], [W - 6, H - 5], [W - 6, 4], [5, H - 5], [(W - 1) / 2, 3], [(W - 1) / 2, H - 4], [3, (H - 1) / 2], [W - 4, (H - 1) / 2], [(W - 1) / 2, (H - 1) / 2]];
+    if (n >= 2 && mapId === 'storm') spots.shift(); // keep the old storm layout first
+    return spots.slice(0, n).map(([x, y], i) => ({ x, y, tx: x, ty: y, next: 7 + i * 2.5 + rand() * 2, anim: 0 }));
   }
 
   function ev(g, k, a, b) { g.events.push({ i: ++g.evId, k, a, b }); if (g.events.length > 12) g.events.shift(); }
@@ -1568,8 +1606,9 @@ OPT = OPT || {};
 const PFX = OPT.prefix || '', EMBED = !!OPT.embed, PRES_TX = OPT.transport === 'presence';
 let visible = !EMBED;
 let W = SIM.W, H = SIM.H;
-const COLORS = ['#ff5a5f', '#3fa9f5', '#ffc93c', '#7ed957'];
-const DARK = ['#b8323a', '#1f6fb0', '#c7911a', '#4a9a2c'];
+const MAXP = 8;
+const COLORS = ['#ff5a5f', '#3fa9f5', '#ffc93c', '#7ed957', '#ff8c42', '#b07cff', '#2fd6c9', '#ff6fb5'];
+const DARK = ['#b8323a', '#1f6fb0', '#c7911a', '#4a9a2c', '#b85a1e', '#6a3fc0', '#1a8a82', '#b83a7a'];
 const ITEM_ICON = { b: '💧', f: '🌊', s: '👟', n: '📌', k: '🦶', t: '🧤', p: '🪇' };
 const ITEM_NAME = { b: 'thêm bom', f: 'tia dài', s: 'giày nhanh', n: 'kim cứu thân', k: 'đá bom', t: 'ném bom', p: 'Phách thần' };
 const ITEM_INFO = [
@@ -1581,9 +1620,9 @@ const ITEM_INFO = [
   ['t', 'Găng ném bom', 'Đứng trên quả bom bấm Space để ném nó xa 3 ô theo hướng đang nhìn (bay qua tường)', 'có / không'],
   ['p', 'Phách thần', 'Chỉ Ông Mây Giông thỉnh thoảng ném ra. Nhặt được: số bom, tốc độ, tia nổ lên TỐI ĐA trong 10 giây', '10 giây'],
 ];
-const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang'];
+const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang', 'Bot Bánh Mì', 'Bot Kem Que', 'Bot Xôi Gà', 'Bot Chè Bưởi'];
 const TEAM_NAME = ['Đội Đỏ-Vàng', 'Đội Xanh-Lá'];
-const CHAR_NAMES = ['Lữ Khách Tím', 'Kỳ Sĩ Cầm Cờ', 'Tiểu Thư Hoa', 'Hiệp Sĩ Nón Cói'];
+const CHAR_NAMES = ['Lữ Khách Tím', 'Kỳ Sĩ Cầm Cờ', 'Tiểu Thư Hoa', 'Hiệp Sĩ Nón Cói', 'Lữ Khách Lục', 'Kỳ Sĩ Cờ Lam', 'Tiểu Thư Ngọc', 'Hiệp Sĩ Nón Tía'];
 const TRAITS = { b: ['Thêm 1 bom', 'Bắt đầu với 2 bom'], s: ['Chạy nhanh', 'Tốc độ +1 cấp từ đầu'], f: ['Tia dài', 'Tia nổ dài thêm 1 ô từ đầu'], n: ['Có kim', 'Bắt đầu với 1 kim chích'] };
 const TRAIT_KEYS = ['b', 's', 'f', 'n'];
 const $ = id => document.getElementById(PFX + id);
@@ -1835,7 +1874,7 @@ const THEMES = {
 };
 const MAP_INFO = {
   classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Bản đồ cổ điển với bụi cỏ để nấp.' },
-  river: { name: '🌊 Sông đôi bờ', theme: 'grass', desc: 'Sông chia đôi sân, chỉ có 2 cây cầu để sang bờ. Tia nước và bom ném bay qua sông được, người thì không.' },
+  river: { name: '🌊 Sông ngã tư', theme: 'grass', desc: 'Sông chữ thập chia sân thành 4 vùng, mỗi nhánh sông chỉ có 1 cây cầu. Tia nước và bom ném bay qua sông được, người thì không.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông, nhà của 2 anh em Ông Mây Giông — bom rơi gấp đôi!' },
   portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
 };
@@ -1851,14 +1890,41 @@ const SPR = (typeof CHAR_SPRITES !== 'undefined' ? CHAR_SPRITES : []).map(c => {
   const o = { ...c, ready: false, img: new Image() };
   o.img.onload = () => { o.ready = true; }; o.img.src = c.src; return o;
 });
+// seats 5-8 reuse the four characters with shifted colours
+const HUE_SHIFT = [150, 175, 200, 120];
+function hueShifted(src, deg, done) {
+  const im = new Image();
+  im.onload = () => {
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), px = d.data, h0 = deg / 360;
+    for (let i = 0; i < px.length; i += 4) {
+      if (!px[i + 3]) continue;
+      const r = px[i] / 255, gg = px[i + 1] / 255, b = px[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2;
+      if (mx - mn < 0.08) continue; // keep greys, black outline and white
+      const dd = mx - mn, s = l > 0.5 ? dd / (2 - mx - mn) : dd / (mx + mn);
+      let h = mx === r ? (gg - b) / dd + (gg < b ? 6 : 0) : mx === gg ? (b - r) / dd + 2 : (r - gg) / dd + 4; h = (h / 6 + h0) % 1;
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+      const f = t => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+      px[i] = f(h + 1 / 3) * 255; px[i + 1] = f(h) * 255; px[i + 2] = f(h - 1 / 3) * 255;
+    }
+    g.putImageData(d, 0, 0); done(c.toDataURL());
+  };
+  im.src = src;
+}
+for (let k = 0, n0 = SPR.length; k < 4 && n0 === 4; k++) {
+  const base = SPR[k], o = { ...base, ready: false, img: new Image() };
+  SPR.push(o);
+  try { hueShifted(base.src, HUE_SHIFT[k], url => { o.src = url; o.img.onload = () => { o.ready = true; }; o.img.src = url; }); } catch (e) { o.img.onload = () => { o.ready = true; }; o.img.src = base.src; }
+}
 
 // ---------- render state ----------
 const R = {
-  face: [0, 0, 0, 0],
-  disp: [null, null, null, null], deadAt: [0, 0, 0, 0], trapAt: [0, 0, 0, 0],
+  face: new Array(MAXP).fill(0), flashes: [],
+  disp: new Array(MAXP).fill(null), deadAt: new Array(MAXP).fill(0), trapAt: new Array(MAXP).fill(0),
   particles: [], falling: new Map(), shake: 0, prev: null, seenEv: 0, roundKey: null,
   flameBorn: new Float64Array(W * H),
-  bush: new Uint8Array(W * H), base: new Array(W * H).fill(''), rustle: new Float64Array(W * H), lastCell: [-1, -1, -1, -1],
+  bush: new Uint8Array(W * H), base: new Array(W * H).fill(''), rustle: new Float64Array(W * H), lastCell: new Array(MAXP).fill(-1),
 };
 function cellAt(m, x, y) { return (x < 0 || y < 0 || x >= W || y >= H) ? '#' : m[y * W + x]; }
 
@@ -1932,7 +1998,8 @@ function handleEvent(e, S) {
   if (e.k === 'tele') {
     const from = Math.floor(e.b / 1000), to = e.b % 1000;
     [600, 900, 1350].forEach((f, i) => tone(f, f * 1.5, 0.1, 'sine', 0.08, i * 0.05));
-    spawnDebris(from % W, (from / W) | 0, '#d9b8ff', 12); spawnDebris(to % W, (to / W) | 0, '#d9b8ff', 12);
+    spawnDebris(from % W, (from / W) | 0, '#d9b8ff', 12); spawnDebris(to % W, (to / W) | 0, '#fff6c8', 18);
+    R.flashes.push({ x: to % W, y: (to / W) | 0, t: now, c: COLORS[e.a] || '#d9b8ff' });
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
@@ -1958,9 +2025,9 @@ function A(k, v) {
 }
 function mirrorServerHost() { // fill the host panel's state from what the server reports
   const S = app.S; if (!S) return;
-  host.seats = [0, 1, 2, 3].map(i => { const s = S.s?.[i]; return !s ? { type: 'empty', peer: null, name: '' } : s[0] === 1 ? { type: 'bot', peer: null, name: s[1] } : { type: 'human', peer: s[2], name: s[1] }; });
+  host.seats = seatIdx(S).map(i => { const s = S.s?.[i]; return !s ? { type: 'empty', peer: null, name: '' } : s[0] === 1 ? { type: 'bot', peer: null, name: s[1] } : { type: 'human', peer: s[2], name: s[1] }; });
   const c = S.cfg || {};
-  Object.assign(host, { mode: c.mode || 'ffa', mapSel: c.map || 'random', size: c.size || 'normal', npc: !!c.npc, auto: !!c.auto, autoCm: !!c.autoCm, autoSeat: !!c.autoSeat, hostPlays: app.role === 'play' });
+  Object.assign(host, { mode: c.mode || 'ffa', mapSel: c.map || 'random', size: c.size || 'normal', npc: !!c.npc, npcN: c.npcN ?? 1, nSeats: host.seats.length, auto: !!c.auto, autoCm: !!c.autoCm, autoSeat: !!c.autoSeat, hostPlays: app.role === 'play' });
 }
 function syncMode() {
   if (SRVM()) return true;
@@ -2045,7 +2112,7 @@ function drawBoard(S, dt, now) {
 
   // smooth players
   const P = S.p || [];
-  for (let s = 0; s < 4; s++) {
+  for (let s = 0; s < MAXP; s++) {
     const p = P[s]; if (!p) { R.disp[s] = null; continue; }
     const tx = p[0] / 100, ty = p[1] / 100;
     let d = R.disp[s];
@@ -2061,7 +2128,7 @@ function drawBoard(S, dt, now) {
   }
 
   // bush rustle: someone entered or is moving inside a bush
-  for (let s = 0; s < 4; s++) {
+  for (let s = 0; s < MAXP; s++) {
     const p = P[s]; if (!p || p[2] === 2) { R.lastCell[s] = -1; continue; }
     const c = Math.round(p[1] / 100) * W + Math.round(p[0] / 100);
     if (R.bush[c] && (c !== R.lastCell[s] || p[10]) && now - R.rustle[c] > 0.25) {
@@ -2091,7 +2158,7 @@ function drawBoard(S, dt, now) {
     }
     // players whose rounded y == row
     const order = [];
-    for (let s = 0; s < 4; s++) { const d = R.disp[s]; if (d && Math.round(d.y) === y) order.push(s); }
+    for (let s = 0; s < MAXP; s++) { const d = R.disp[s]; if (d && Math.round(d.y) === y) order.push(s); }
     order.sort((a, b) => R.disp[a].y - R.disp[b].y);
     for (const s of order) drawPlayer(S, s, now);
     for (let x = 0; x < W; x++) if (R.bush[y * W + x]) drawBush(x, y, now, S.m[y * W + x] === '*');
@@ -2113,8 +2180,9 @@ function drawBoard(S, dt, now) {
     ctx.fillRect(SX(q.x) - q.s * T / 2, SY(q.y) - q.z * HZ - q.s * T / 2, q.s * T, q.s * T);
   }
   ctx.globalAlpha = 1;
+  drawFlashes(now);
   // name tags on top
-  for (let s = 0; s < 4; s++) drawTag(S, s);
+  for (let s = 0; s < MAXP; s++) drawTag(S, s);
   ctx.restore();
 }
 
@@ -2136,8 +2204,23 @@ function drawBlock(x, y, kind, now, i) {
   if (kind === 'pillar') ctx.drawImage(sprites.pillar, SX(x) - T / 2, SY(y) - TY / 2 - sprites.pillarH + sprites.pillarOff, T, TY + sprites.pillarH);
   else drawSprite('wall', x, y);
 }
+const isWet = (x, y) => x >= 0 && y >= 0 && x < W && y < H && (R.base[y * W + x] === '~' || R.base[y * W + x] === '=');
 function drawWater(x, y, now) {
   const x0 = SX(x) - T / 2, y0 = SY(y) - TY / 2;
+  if (!isWet(x - 1, y) && !isWet(x + 1, y) && (isWet(x, y - 1) || isWet(x, y + 1))) { // north-south arm of the river
+    const g = ctx.createLinearGradient(x0, 0, x0 + T, 0);
+    g.addColorStop(0, '#1f6fb8'); g.addColorStop(0.5, '#3fa0e8'); g.addColorStop(1, '#1f6fb8');
+    ctx.fillStyle = g; ctx.fillRect(x0, y0 - 0.5, T, TY + 1);
+    ctx.fillStyle = 'rgba(20,50,90,.5)'; ctx.fillRect(x0, y0 - 0.5, T * 0.12, TY + 1); ctx.fillRect(x0 + T * 0.88, y0 - 0.5, T * 0.12, TY + 1);
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5;
+    for (let k = 0; k < 2; k++) {
+      const xx = x0 + T * (0.35 + k * 0.3), ph = now * 2.2 + y * 0.9 + k * 2;
+      ctx.beginPath();
+      for (let t = 0; t <= 1.001; t += 0.1) { const yy = y0 + t * TY, w = Math.sin(ph + t * 6) * 2; t === 0 ? ctx.moveTo(xx + w, yy) : ctx.lineTo(xx + w, yy); }
+      ctx.stroke();
+    }
+    return;
+  }
   const g = ctx.createLinearGradient(0, y0, 0, y0 + TY);
   g.addColorStop(0, '#1f6fb8'); g.addColorStop(1, '#3fa0e8');
   ctx.fillStyle = g; ctx.fillRect(x0 - 0.5, y0, T + 1, TY);
@@ -2153,6 +2236,15 @@ function drawWater(x, y, now) {
   }
 }
 function drawBridge(x, y) {
+  if (R.base[y * W + x - 1] === '~' && R.base[y * W + x + 1] === '~') { // crossing a north-south arm: planks run east-west
+    const x0 = SX(x) - T * 0.62, y0 = SY(y) - TY * 0.42, w = T * 1.24, h = TY * 0.84;
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 3, y0 + 4, w, h);
+    ctx.fillStyle = '#b5793c'; ctx.fillRect(x0, y0, w, h);
+    ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = 1.2;
+    for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x0 + w * k / 6, y0); ctx.lineTo(x0 + w * k / 6, y0 + h); ctx.stroke(); }
+    ctx.fillStyle = '#6e3f17'; ctx.fillRect(x0, y0 - 3, w, 4); ctx.fillRect(x0, y0 + h - 1, w, 4);
+    return;
+  }
   const x0 = SX(x) - T * 0.42, y0 = SY(y) - TY * 0.62, w = T * 0.84, h = TY * 1.24;
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 3, y0 + 4, w, h);
   ctx.fillStyle = '#b5793c'; ctx.fillRect(x0, y0, w, h);
@@ -2429,13 +2521,60 @@ function drawPlayer(S, s, now) {
   }
   ctx.restore();
 }
+// bright burst where a portal drops someone off
+function drawFlashes(now) {
+  for (let k = R.flashes.length - 1; k >= 0; k--) {
+    const f = R.flashes[k], a = now - f.t, L = 0.7;
+    if (a > L || a < -0.1) { R.flashes.splice(k, 1); continue; }
+    const u = Math.max(0, a) / L, cx = SX(f.x), cy = SY(f.y), fade = 1 - u;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    // light pillar
+    const pw = T * (0.55 - 0.3 * u), ph = T * 2.6;
+    const pg = ctx.createLinearGradient(0, cy - ph, 0, cy);
+    pg.addColorStop(0, 'rgba(255,255,255,0)'); pg.addColorStop(0.7, `rgba(255,250,220,${0.7 * fade})`); pg.addColorStop(1, `rgba(255,255,255,${0.9 * fade})`);
+    ctx.fillStyle = pg; ctx.fillRect(cx - pw / 2, cy - ph, pw, ph);
+    // glow
+    const gr = T * (0.5 + 1.1 * u);
+    const gg = ctx.createRadialGradient(cx, cy - T * 0.4, 0, cx, cy - T * 0.4, gr);
+    gg.addColorStop(0, `rgba(255,255,255,${fade})`); gg.addColorStop(0.35, `rgba(255,240,170,${0.75 * fade})`); gg.addColorStop(1, 'rgba(200,140,255,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, cy - T * 0.4, gr, 0, 7); ctx.fill();
+    // star rays
+    ctx.strokeStyle = `rgba(255,255,230,${fade})`; ctx.lineWidth = Math.max(2, T * 0.06);
+    for (let i = 0; i < 8; i++) {
+      const ang = i * Math.PI / 4 + a * 2, r0 = T * (0.25 + u * 0.6), r1 = r0 + T * (i % 2 ? 0.35 : 0.6) * fade;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * r0, cy - T * 0.4 + Math.sin(ang) * r0 * 0.8); ctx.lineTo(cx + Math.cos(ang) * r1, cy - T * 0.4 + Math.sin(ang) * r1 * 0.8); ctx.stroke();
+    }
+    // ground ring in the player's colour
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = f.c; ctx.globalAlpha = fade; ctx.lineWidth = Math.max(2, T * 0.08 * fade + 1);
+    ctx.beginPath(); ctx.ellipse(cx, cy + TY * 0.1, T * (0.3 + u * 0.9), TY * (0.17 + u * 0.5), 0, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+}
+// spinning arrow over the character you control
+function drawMeArrow(cx, y, now) {
+  const bob = Math.sin(now * 5) * T * 0.08, sx = Math.cos(now * 3.2), w = Math.max(9, T * 0.4) * Math.max(0.3, Math.abs(sx)), h = Math.max(14, T * 0.5);
+  const top = y - h - T * 0.1 + bob;
+  ctx.save();
+  const light = sx > 0;
+  ctx.beginPath();
+  // arrow: shaft + head pointing down
+  ctx.moveTo(cx - w * 0.38, top); ctx.lineTo(cx + w * 0.38, top); ctx.lineTo(cx + w * 0.38, top + h * 0.45);
+  ctx.lineTo(cx + w, top + h * 0.45); ctx.lineTo(cx, top + h); ctx.lineTo(cx - w, top + h * 0.45); ctx.lineTo(cx - w * 0.38, top + h * 0.45); ctx.closePath();
+  ctx.fillStyle = light ? '#ffe14d' : '#f0a500';
+  ctx.strokeStyle = '#2b1a00'; ctx.lineWidth = Math.max(2, T * 0.05); ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(255,225,77,.8)'; ctx.shadowBlur = T * 0.25;
+  ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
+  ctx.restore();
+}
 function drawTag(S, s) {
   const p = S.p?.[s], d = R.disp[s]; if (!p || !d || p[2] === 2) return;
-  const vis = visibility(S, s); if (vis === 0) return;
+  const vis = visibility(S, s); if (vis === 0) return; // only an opponent hiding in a bush has no name tag
   const name = seatName(S, s), me = isMySeat(S, s);
-  ctx.save(); ctx.globalAlpha = Math.max(0.5, vis);
+  ctx.save(); ctx.globalAlpha = me ? 1 : Math.max(0.75, vis);
   const cx = SX(d.x), y = SY(d.y) - (p[2] === 1 ? 0.35 * HZ : 0) - T * 1.25 - 4;
-  ctx.font = `700 ${Math.max(10, Math.round(T * 0.27))}px "Baloo 2",sans-serif`;
+  if (me) drawMeArrow(cx, y - Math.max(14, T * 0.34) - 2, performance.now() / 1000);
+  ctx.font = `800 ${Math.max(12, Math.round(T * 0.3))}px "Baloo 2",sans-serif`;
   const label = (me ? '★ ' + name : name) + (p[15] > 0 ? ` ⚡${Math.ceil(p[15] / 10)}s` : '');
   const w = ctx.measureText(label).width + 10, h = Math.max(14, T * 0.34);
   ctx.fillStyle = me ? 'rgba(79,195,255,.95)' : 'rgba(10,18,34,.75)';
@@ -2456,7 +2595,9 @@ const showBoardStats = false;
 
 // ---------- HUD ----------
 let lastHud = '';
-function mySeat(S) { if (!S || !S.s) return -1; for (let i = 0; i < 4; i++) if (isMySeat(S, i)) return i; return -1; }
+const nSeats = S => Math.max(4, Math.min(MAXP, (S && S.s && S.s.length) || 4));
+const seatIdx = S => [...Array(nSeats(S)).keys()];
+function mySeat(S) { if (!S || !S.s) return -1; for (let i = 0; i < S.s.length; i++) if (isMySeat(S, i)) return i; return -1; }
 function isMySeat(S, i) { const st = S?.s?.[i]; return !!(st && st[0] === 2 && st[2] && st[2] === app.myPeer); }
 function fmtTime(t) { t = Math.max(0, t | 0); return `${(t / 60) | 0}:${String(t % 60).padStart(2, '0')}`; }
 function updateHud() {
@@ -2501,14 +2642,16 @@ function updateHud() {
   $('bPlay').style.display = app.mode === 'online' ? '' : 'none';
   // seats
   let html = '';
-  for (let i = 0; i < 4; i++) {
+  const nS = nSeats(S);
+  $('left').classList.toggle('many', nS > 4);
+  for (let i = 0; i < nS; i++) {
     const st = S?.s?.[i], p = S?.p?.[i];
     const type = st ? st[0] : 0;
     const name = type ? seatName(S, i) : 'Ghế trống';
     const tag = type === 1 ? '🤖 Máy' : type === 2 ? '👤 Người' : '—';
     const status = !p ? '' : p[2] === 0 ? '🟢' : p[2] === 1 ? '🫧' : '💀';
     const stats = p ? `💧${p[4]} 🌊${p[5]} 👟${p[6]} 📌${p[7]}${p[13] ? ' 🦶' : ''}${p[14] ? ' 🧤' : ''}` : tag;
-    const teamTag = S?.md === 'team' && type ? ` · ${i % 2 === 0 ? 'Đỏ-Vàng' : 'Xanh-Lá'}` : '';
+    const teamTag = S?.md === 'team' && type ? ` · ${TEAM_NAME[i % 2].replace('Đội ', '')}` : '';
     html += `<div class="seat ${isMySeat(S, i) ? 'me' : ''} ${p && p[2] === 2 ? 'dead' : ''}">
       <div class="dot" style="background:${COLORS[i]}">${status}</div>
       <div class="mid"><div class="nm">${esc(name)}${st && st[3] ? ` <span class="trb" title="Đặc tính: ${TRAITS[st[3]]?.[1] || ''}">${traitIcon(st[3])}</span>` : ''}</div><div class="sub">${type ? tag + teamTag : ''}</div>${p ? `<div class="its"><span title="Số bom">${iconHTML('b')}${p[4]}</span><span title="Độ dài tia">${iconHTML('f')}${p[5]}</span><span title="Tốc độ">👟${p[6]}</span><span title="Kim">📌${p[7]}</span><span title="Đá bom" class="${p[13] ? '' : 'off'}">🦶</span><span title="Ném bom" class="${p[14] ? '' : 'off'}">🧤</span>${p[15] > 0 ? `<span class="pwr" title="Phách thần: chỉ số tối đa">${iconHTML('p')}${Math.ceil(p[15] / 10)}s</span>` : ''}</div>` : ''}</div>
@@ -2537,7 +2680,7 @@ function statsTable(S, big) {
   const cols = [[iconHTML('b'), 'Số bom', p => p[4]], [iconHTML('f'), 'Độ dài tia', p => p[5]], ['👟', 'Tốc độ (cấp 0–6)', p => p[6]], ['📌', 'Kim', p => p[7]], ['🦶', 'Đá bom', p => p[13] ? '✔' : '–'], ['🧤', 'Ném bom', p => p[14] ? '✔' : '–']];
   if (big) cols.push(['💥', 'Hạ gục (ván này)', p => p[8]]);
   let h = `<table class="stbl${big ? ' big' : ''}"><tr><th></th>${cols.map(c => `<th title="${c[1]}">${c[0]}${big ? '<small>' + c[1] + '</small>' : ''}</th>`).join('')}${big ? '<th>🏆<small>Ván thắng</small></th>' : ''}<th title="Điểm: hạ gục +1, thắng ván +2">⭐${big ? '<small>Điểm</small>' : ''}</th></tr>`;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < nSeats(S); i++) {
     const p = S?.p?.[i], st = S?.s?.[i]; if (!st) continue;
     const dead = p && p[2] === 2;
     h += `<tr class="${dead ? 'dead' : ''} ${isMySeat(S, i) ? 'me' : ''}"><td><span class="sd" style="background:${COLORS[i]}"></span>${esc(seatName(S, i))}</td>`;
@@ -2552,7 +2695,7 @@ function pickHTML(S) {
   if (ms >= 0) {
     h += `<div class="pkb">${TRAIT_KEYS.map(k => `<button data-pick="${k}" class="${k === myTrait ? 'on' : ''}"><span class="pki">${traitIcon(k)}</span><b>${TRAITS[k][0]}</b><small>${TRAITS[k][1]}</small></button>`).join('')}</div>`;
   } else h += `<div class="pkw">Các người chơi đang chọn đặc tính…</div>`;
-  h += `<div class="pkl">${[0, 1, 2, 3].filter(i => S.s?.[i]).map(i => `<span style="--c:${COLORS[i]}">${esc(seatName(S, i))}: ${traitIcon(S.s[i][3] || 'b')} ${TRAITS[S.s[i][3] || 'b'][0]}</span>`).join('')}</div></div>`;
+  h += `<div class="pkl">${seatIdx(S).filter(i => S.s?.[i]).map(i => `<span style="--c:${COLORS[i]}">${esc(seatName(S, i))}: ${traitIcon(S.s[i][3] || 'b')} ${TRAITS[S.s[i][3] || 'b'][0]}</span>`).join('')}</div></div>`;
   return h;
 }
 function mapInfoHTML(S) {
@@ -2576,11 +2719,11 @@ function updateCenter(S, now) {
     else if (S.ph === 'end') {
       let t = '🤝 Hoà!';
       if (S.wn >= 0) {
-        const winners = S.md === 'team' ? [0, 1, 2, 3].filter(i => S.p?.[i] && S.p[i][11] === S.wn) : [S.wn];
+        const winners = S.md === 'team' ? seatIdx(S).filter(i => S.p?.[i] && S.p[i][11] === S.wn) : [S.wn];
         t = (S.md === 'team' ? `🏆 ${TEAM_NAME[S.wn]} thắng!` : '🏆 Chiến thắng!') + `<div class="winrow">${winners.map(i => `<div class="wincard" style="--c:${COLORS[i]}">${SPR[i] ? `<img src="${SPR[i].src}" alt="">` : ''}<div class="wcn">${CHAR_NAMES[i]}</div><div class="wpn">${esc(seatName(S, i))}</div></div>`).join('')}</div>`;
       }
-      const rows = [0, 1, 2, 3].filter(i => S.s?.[i]).sort((a, b) => (S.sc?.[b] || 0) - (S.sc?.[a] || 0));
-      const board = `<div class="sboard">${rows.map((i, k) => `<div class="sbr"><span>${['🥇', '🥈', '🥉', '4.'][k]}</span>${SPR[i] ? `<img class="sbi" src="${SPR[i].src}" alt="">` : `<span class="sd" style="background:${COLORS[i]}"></span>`}<b>${esc(seatName(S, i))}<small> · ${CHAR_NAMES[i]}</small></b><i>💥${S.p?.[i]?.[8] ?? 0}${S.wn >= 0 && S.p?.[i] && S.p[i][11] === S.wn ? ' · 🏆 +2' : ''}</i><em>⭐ ${S.sc?.[i] || 0}</em></div>`).join('')}<div class="sbn">Hạ gục +1 điểm · Thắng ván +2 điểm</div></div>`;
+      const rows = seatIdx(S).filter(i => S.s?.[i]).sort((a, b) => (S.sc?.[b] || 0) - (S.sc?.[a] || 0));
+      const board = `<div class="sboard">${rows.map((i, k) => `<div class="sbr"><span>${(['🥇', '🥈', '🥉'][k] || (k + 1) + '.')}</span>${SPR[i] ? `<img class="sbi" src="${SPR[i].src}" alt="">` : `<span class="sd" style="background:${COLORS[i]}"></span>`}<b>${esc(seatName(S, i))}<small> · ${CHAR_NAMES[i]}</small></b><i>💥${S.p?.[i]?.[8] ?? 0}${S.wn >= 0 && S.p?.[i] && S.p[i][11] === S.wn ? ' · 🏆 +2' : ''}</i><em>⭐ ${S.sc?.[i] || 0}</em></div>`).join('')}<div class="sbn">Hạ gục +1 điểm · Thắng ván +2 điểm</div></div>`;
       h = `<div class="res">${t}</div>${board}<div class="sm">${S.auto ? 'Ván mới sau ' + Math.max(0, Math.ceil(S.t)) + ' giây…' : 'Chờ host mở ván mới'}</div>`;
     }
   }
@@ -2658,16 +2801,31 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) $('touch').style.d
 // phones: suggest landscape + fullscreen button
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   document.body.classList.add('touchdev');
-  if (!EMBED) $('bFull').style.display = '';
+}
+if (EMBED) $('bFull').style.display = 'none';
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+async function enterFull() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return false;
+  try { await req.call(el, { navigationUI: 'hide' }); return true; } catch (e) { return false; }
 }
 async function goLandscape() {
   ac();
-  const el = document.documentElement;
-  try { if (!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* ignore */ }
+  let ok = !!fsEl() || await enterFull();
+  if (!ok && isTouch && !window.navigator.standalone) toast('iPhone chưa cho web chạy toàn màn hình: bấm nút Chia sẻ ⬆️ → "Thêm vào MH chính", rồi mở game từ biểu tượng đó.', 6000);
+  if (!isTouch) return;
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) { /* ignore */ }
   setTimeout(() => { if (window.innerHeight > window.innerWidth) toast('Hãy xoay ngang điện thoại (bật xoay màn hình nếu đang khoá)', 3500); layout(); }, 400);
 }
-$('bFull').onclick = () => { if (document.fullscreenElement) { document.exitFullscreen?.(); } else goLandscape(); };
+$('bFull').onclick = () => {
+  if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); return; }
+  if (isTouch) goLandscape();
+  else enterFull().then(ok => { if (!ok) toast('Trình duyệt không cho bật toàn màn hình, thử phím F11', 3000); });
+};
+const syncFullBtn = () => { $('bFull').textContent = fsEl() ? '🗗' : '⛶'; $('bFull').title = fsEl() ? 'Thoát toàn màn hình' : 'Toàn màn hình'; setTimeout(layout, 150); };
+document.addEventListener('fullscreenchange', syncFullBtn); document.addEventListener('webkitfullscreenchange', syncFullBtn);
 $('rotGo').onclick = () => { document.body.classList.add('portraitok'); goLandscape(); };
 $('rotSkip').onclick = () => { document.body.classList.add('portraitok'); setTimeout(layout, 50); };
 window.addEventListener('orientationchange', () => setTimeout(layout, 300));
@@ -2786,11 +2944,11 @@ function firstHelp() { if (store.get('helpSeen', '') !== '1') setTimeout(() => t
 
 // ================= HOST =================
 const host = {
-  g: null, seats: null, seed: 0, mode: 'ffa', paused: false, size: 'normal', mapSel: 'random', curMap: 'classic', npc: true, hostPlays: false, auto: true, autoCm: true,
-  lastIn: {}, wins: [0, 0, 0, 0], score: [0, 0, 0, 0], botTraits: ['b', 's', 'f', 'n'], occ: ['', '', '', ''], evId: 0, rk: 0, tick: 0, timer: 0,
+  g: null, seats: null, seed: 0, mode: 'ffa', paused: false, size: 'normal', mapSel: 'random', curMap: 'classic', npc: true, npcN: 1, nSeats: 4, hostPlays: false, auto: true, autoCm: true,
+  lastIn: {}, wins: new Array(MAXP).fill(0), score: new Array(MAXP).fill(0), botTraits: ['b', 's', 'f', 'n', 'b', 's', 'f', 'n'], occ: new Array(MAXP).fill(''), evId: 0, rk: 0, tick: 0, timer: 0,
   cmQueue: [], cmLast: 0, cmId: 0, seenEv: 0, kicked: new Set(), forced: new Map(), autoSeat: true, pick: null,
 };
-function defaultSeats() { return [0, 1, 2, 3].map(i => ({ type: 'bot', peer: null, name: BOT_NAMES[i] })); }
+function defaultSeats(n) { return [...Array(n || host.nSeats || 4).keys()].map(i => ({ type: 'bot', peer: null, name: BOT_NAMES[i] })); }
 function seatTrait(i) {
   const s = host.seats[i];
   if (s.type === 'human') {
@@ -2800,7 +2958,7 @@ function seatTrait(i) {
   }
   return host.botTraits[i] || 'b';
 }
-function rollBotTraits() { host.botTraits = [0, 1, 2, 3].map(() => TRAIT_KEYS[(Math.random() * 4) | 0]); }
+function rollBotTraits() { host.botTraits = [...Array(MAXP).keys()].map(() => TRAIT_KEYS[(Math.random() * 4) | 0]); }
 function hostPlayersCfg() {
   return host.seats.map((s, i) => s.type === 'empty' ? null : { name: s.type === 'bot' ? s.name || BOT_NAMES[i] : s.name, bot: s.type === 'bot', trait: seatTrait(i) });
 }
@@ -2813,7 +2971,7 @@ function hostNewGame(phase) {
   host.seed = (Math.random() * 1e9) | 0; rollBotTraits();
   host.curMap = pickMap();
   host.rk++;
-  host.g = SIM.createGame({ seed: host.seed, map: host.curMap, size: host.size, npc: host.npc, mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
+  host.g = SIM.createGame({ seed: host.seed, map: host.curMap, size: host.size, npc: host.npcN > 0, npcN: host.npcN + (host.curMap === 'storm' ? 1 : 0), mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
   host.g.phase = phase;
   if (phase === 'pick') host.g.t = PICK_TIME;
   host.lastIn = {};
@@ -2821,17 +2979,17 @@ function hostNewGame(phase) {
 const PICK_TIME = 10;
 // rebuild the round with the latest traits, keeping seed / map (used during the pick phase)
 function hostRebuildPick(t, phase) {
-  host.g = SIM.createGame({ seed: host.seed, map: host.curMap, size: host.size, npc: host.npc, mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
+  host.g = SIM.createGame({ seed: host.seed, map: host.curMap, size: host.size, npc: host.npcN > 0, npcN: host.npcN + (host.curMap === 'storm' ? 1 : 0), mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
   host.g.phase = phase; host.g.t = t;
 }
 function hostRebuildLobby() {
   // same seed so map doesn't change while seats change
-  host.g = SIM.createGame({ seed: host.seed || 1, map: host.curMap, size: host.size, npc: host.npc, mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
+  host.g = SIM.createGame({ seed: host.seed || 1, map: host.curMap, size: host.size, npc: host.npcN > 0, npcN: host.npcN + (host.curMap === 'storm' ? 1 : 0), mode: host.mode, players: hostPlayersCfg(), wins: host.wins, score: host.score, evId: host.evId });
   host.g.phase = 'lobby';
 }
 function startHosting() {
   app.isHost = true; app.hostSince = Date.now();
-  host.seats = defaultSeats(); host.wins = [0, 0, 0, 0]; host.score = [0, 0, 0, 0]; host.occ = ['', '', '', ''];
+  host.seats = defaultSeats(); host.wins = new Array(MAXP).fill(0); host.score = new Array(MAXP).fill(0); host.occ = new Array(MAXP).fill('');
   host.seed = (Math.random() * 1e9) | 0; host.rk = (Math.random() * 1e6) | 0; host.curMap = pickMap();
   host.hostPlays = app.mode === 'solo' || app.role === 'play';
   $('hpPlay').checked = host.hostPlays;
@@ -2964,10 +3122,10 @@ function hostTick(dt) {
   const g = host.g; if (!g) return;
   hostSeatMaintenance();
   const pm = peerMap();
-  const inputs = [null, null, null, null];
-  for (let i = 0; i < 4; i++) {
+  const inputs = g.players.map(() => null);
+  for (let i = 0; i < g.players.length; i++) {
     const p = g.players[i]; if (!p) continue;
-    const seat = host.seats[i];
+    const seat = host.seats[i]; if (!seat) continue;
     if (p.bot || seat.type !== 'human') { inputs[i] = SIM.botThink(g, p); continue; }
     let src = null;
     if (seat.peer === app.myPeer) src = hostSelfInput();
@@ -2986,7 +3144,7 @@ function hostTick(dt) {
     g.t -= dt;
     if (g.t <= 0) { hostRebuildPick(SIM.COUNT_TIME, 'count'); }
   } else SIM.step(g, dt, inputs);
-  host.evId = g.evId; host.wins = g.wins.slice(); host.score = g.score.slice();
+  host.evId = g.evId; g.wins.forEach((v, i) => { host.wins[i] = v; }); g.score.forEach((v, i) => { host.score[i] = v; });
   if (g.phase === 'end' && g.t <= 0) {
     if (host.auto) { hostSeatMaintenance(); hostNewGame('pick'); }
     else { host.seed = (Math.random() * 1e9) | 0; host.curMap = pickMap(); hostRebuildLobby(); }
@@ -3061,7 +3219,7 @@ function roomPeople() {
 function renderHostPanel(force) {
   if (!amHost()) return;
   if (SRVM()) mirrorServerHost();
-  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; $('hpNpc').checked = host.npc; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
+  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; if (document.activeElement !== $('hpNpcN')) $('hpNpcN').value = host.npcN; $('hpCount').value = host.nSeats; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
   const people = roomPeople();
   const key = JSON.stringify([host.seats, people, host.pick]);
   if (!force && (key === hpKey || hpDragging)) return;
@@ -3120,7 +3278,25 @@ function renderHostPanel(force) {
 setInterval(() => { if (amHost() && $('hostPanel').style.display === 'block') renderHostPanel(); }, 400);
 $('hpMode').onchange = () => { if (A('mode', $('hpMode').value)) return; host.mode = $('hpMode').value; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Chế độ mới áp dụng từ ván sau'); };
 $('hpAuto').onchange = () => { if (A('auto', $('hpAuto').checked)) return; host.auto = $('hpAuto').checked; };
-$('hpNpc').onchange = () => { if (A('npc', $('hpNpc').checked)) return; host.npc = $('hpNpc').checked; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Áp dụng từ ván sau'); };
+$('hpNpcN').onchange = () => {
+  const n = Math.max(0, Math.min(10, Math.round(+$('hpNpcN').value || 0))); $('hpNpcN').value = n;
+  if (A('npcN', n)) return;
+  host.npcN = n; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Áp dụng từ ván sau');
+};
+$('hpCount').onchange = () => {
+  const n = Math.max(4, Math.min(MAXP, +$('hpCount').value || 4));
+  if (A('count', n)) return;
+  hostSetCount(n);
+};
+function hostSetCount(n) {
+  const g = host.g;
+  if (g && g.phase !== 'lobby' && g.phase !== 'end' && g.phase !== 'pick') { $('hpCount').value = host.nSeats; return toast('Đổi số người khi trận đã kết thúc nhé'); }
+  host.nSeats = n;
+  while (host.seats.length < n) { const i = host.seats.length; host.seats.push({ type: 'bot', peer: null, name: BOT_NAMES[i] }); }
+  while (host.seats.length > n) { const s = host.seats.pop(); if (s.type === 'human' && s.peer) host.kicked.add(s.peer); }
+  if (g && g.phase === 'pick') hostRebuildPick(g.t, 'pick'); else hostRebuildLobby();
+  renderHostPanel(true);
+}
 $('hpAutoCm').onchange = () => { if (A('autoCm', $('hpAutoCm').checked)) return; host.autoCm = $('hpAutoCm').checked; };
 $('hpAutoSeat').onchange = () => { if (A('autoSeat', $('hpAutoSeat').checked)) return; host.autoSeat = $('hpAutoSeat').checked; toast(host.autoSeat ? 'Người muốn chơi sẽ tự vào ghế trống' : 'Chỉ host xếp người vào ghế', 2000); };
 $('hpPlay').onchange = () => { if (SRVM()) return setRole($('hpPlay').checked ? 'play' : 'watch'); host.hostPlays = $('hpPlay').checked; app.role = host.hostPlays ? 'play' : 'watch'; if (app.nroom) app.nroom.presence({ want: app.role }).catch(() => {}); };
@@ -3139,7 +3315,7 @@ $('hpMap').onchange = () => {
   else toast('Bản đồ mới áp dụng từ ván sau');
 };
 $('hpStop').onclick = () => { if (A('stop')) return; host.seed = (Math.random() * 1e9) | 0; host.rk++; hostRebuildLobby(); };
-$('hpReset').onclick = () => { if (A('reset')) return toast('Đã xoá bảng điểm'); host.wins = [0, 0, 0, 0]; host.g.wins = [0, 0, 0, 0]; host.score = [0, 0, 0, 0]; host.g.score = [0, 0, 0, 0]; toast('Đã xoá bảng điểm'); };
+$('hpReset').onclick = () => { if (A('reset')) return toast('Đã xoá bảng điểm'); host.wins = new Array(MAXP).fill(0); host.g.wins = host.g.wins.map(() => 0); host.score = new Array(MAXP).fill(0); host.g.score = host.g.score.map(() => 0); toast('Đã xoá bảng điểm'); };
 $('hpClose').onclick = () => $('hostPanel').style.display = 'none';
 $('bPanel').onclick = () => { const hp = $('hostPanel'); hp.style.display = hp.style.display === 'block' ? 'none' : 'block'; renderHostPanel(); };
 const sendCm = () => { const v = $('hpCm').value; $('hpCm').value = ''; hostComment(v); };
@@ -3324,7 +3500,7 @@ $('sSolo').onclick = () => {
   app.mode = 'solo'; app.role = 'play'; app.myPeer = 'local';
   $('start').style.display = 'none'; $('roomTag').textContent = 'Chơi với máy'; firstHelp();
   startHosting();
-  addFeed('Chơi với 3 bot. Mở ⚙️ để đổi chế độ 2 vs 2, thêm/bớt bot.', 'sys');
+  addFeed('Chơi với 3 bot. Mở ⚙️ để chọn tới 8 người, chia đội, số Ông Mây Giông.', 'sys');
 };
 ['sName', 'sRoom'].forEach(id => $(id).addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !$('sPlay').disabled) $('sPlay').click(); }));
 
@@ -3332,7 +3508,7 @@ $('sSolo').onclick = () => {
 (function preview() {
   const g = SIM.createGame({ seed: 42, mode: 'ffa', players: BOT_NAMES.map(n => ({ name: n, bot: true })) });
   g.phase = 'lobby';
-  const snap = SIM.encode(g); snap.s = BOT_NAMES.map(n => [1, n, '']); snap.rk = -1;
+  const snap = SIM.encode(g); snap.s = BOT_NAMES.slice(0, 4).map(n => [1, n, '']); snap.rk = -1;
   app.S = snap;
 })();
 
@@ -3397,7 +3573,7 @@ if (EMBED) {
 window.addEventListener('resize', layout);
 layout();
 requestAnimationFrame(frame);
-window.__boom = { app, host, SIM, R, visibility, PRED };
+window.__boom = { app, host, SIM, R, visibility, PRED, SPR };
 return api;
 }
 

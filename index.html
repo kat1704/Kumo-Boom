@@ -1145,7 +1145,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
   const RTC_CFG = { iceServers: STUN.slice() };
   // Cloudflare TURN relay (via the owner's Worker): used only when a direct link is blocked by the network
   const TURN_URL = 'https://kumo-boom.trunganh1704.workers.dev/';
-  let turnAt = 0, turnP = null, turnOk = false;
+  let turnAt = 0, turnP = null, turnOk = false, turnErr = 'đang lấy…';
   function refreshTurn() {
     if (turnP || (turnOk && Date.now() - turnAt < 20 * 3600e3)) return turnP || Promise.resolve();
     turnP = (async () => {
@@ -1153,13 +1153,14 @@ if (typeof module !== 'undefined') module.exports = SIM;
         const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
         const res = await fetch(TURN_URL, { cache: 'no-store', signal: ctl.signal });
         clearTimeout(t);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text().catch(() => '')).slice(0, 80));
         const data = await res.json();
         let ice = data && data.iceServers;
         if (ice && !Array.isArray(ice)) ice = [ice];
         ice = (ice || []).filter(x => x && x.urls);
-        if (ice.length) { RTC_CFG.iceServers = STUN.concat(ice); turnOk = true; turnAt = Date.now(); }
-      } catch (e) { console.warn('TURN unavailable, direct links only', e); }
+        if (ice.length) { RTC_CFG.iceServers = STUN.concat(ice); turnOk = true; turnAt = Date.now(); turnErr = ''; }
+        else turnErr = 'Worker trả về không có máy chủ TURN';
+      } catch (e) { turnErr = (e && e.name === 'AbortError') ? 'Worker không trả lời (quá 5s)' : String(e && e.message || e).slice(0, 90); console.warn('TURN unavailable, direct links only', e); }
       finally { turnP = null; }
     })();
     return turnP;
@@ -1239,8 +1240,10 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (typeof m.q === 'number') { const last = lastSeq.get(id) || 0; if (m.q <= last && m.q > last - 100000) return; lastSeq.set(id, m.q); }
       setPres(id, m.p && typeof m.p === 'object' ? m.p : {});
     }
-    function killLink(id, failed) {
+    const lastFail = new Map(), tries = new Map();
+    function killLink(id, failed, why) {
       const l = links.get(id); if (!l) return;
+      if (failed) lastFail.set(id, (why || l.pc.connectionState || 'lỗi') + ' · ICE ' + l.pc.iceConnectionState + ' · ứng viên mình: ' + ([...l.lc].join(',') || 'không có') + ' · của bạn: ' + ([...l.rc].join(',') || 'không có'));
       links.delete(id);
       try { l.dc && l.dc.close(); } catch (e) { /* ignore */ }
       try { l.pc.close(); } catch (e) { /* ignore */ }
@@ -1257,7 +1260,12 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (!HAS_RTC || left) return;
       await refreshTurn();
       killLink(id);
-      const pc = new RTCPeerConnection(RTC_CFG), l = { pc, dc: null, ready: false };
+      const pc = new RTCPeerConnection(RTC_CFG), l = { pc, dc: null, ready: false, lc: new Set(), rc: new Set() };
+      tries.set(id, (tries.get(id) || 0) + 1);
+      pc.onicecandidate = e => { if (e.candidate && e.candidate.type) l.lc.add(e.candidate.type); };
+      const remoteTypes = sdp => { for (const m of String(sdp).matchAll(/ typ (host|srflx|prflx|relay)/g)) l.rc.add(m[1]); };
+      if (offerSdp) remoteTypes(offerSdp);
+      l.remoteTypes = remoteTypes;
       links.set(id, l);
       const setup = dc => {
         l.dc = dc;
@@ -1277,7 +1285,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (!offerSdp) setup(pc.createDataChannel('g', { ordered: false, maxRetransmits: 0 }));
       else pc.ondatachannel = e => setup(e.channel);
       pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState) && links.get(id) === l) killLink(id, true); };
-      setTimeout(() => { if (links.get(id) === l && !l.ready) killLink(id, true); }, 12000);
+      setTimeout(() => { if (links.get(id) === l && !l.ready) killLink(id, true, l.gotAnswer || offerSdp ? 'hết 12s chưa nối được' : 'không nhận được trả lời từ máy kia'); }, 12000);
       try {
         if (!offerSdp) {
           await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc);
@@ -1287,7 +1295,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
           await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc);
           if (links.get(id) === l) pub('s/' + id, { id: myId, a: pc.localDescription.sdp });
         }
-      } catch (e) { if (links.get(id) === l) killLink(id, true); }
+      } catch (e) { if (links.get(id) === l) killLink(id, true, 'lỗi SDP: ' + (e && e.message || e)); }
     }
     function maybeLink(id) { // the lower id dials; failed pairs wait 20 s before trying again
       if (!HAS_RTC || id === myId || links.has(id) || !(myId < id)) return;
@@ -1308,7 +1316,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
         maybeLink(m.id);
       } else if (sub === 's/' + myId) {
         if (typeof m.o === 'string') makeLink(m.id, m.o);
-        else if (typeof m.a === 'string') { const l = links.get(m.id); if (l && l.pc.signalingState === 'have-local-offer') l.pc.setRemoteDescription({ type: 'answer', sdp: m.a }).catch(() => killLink(m.id, true)); }
+        else if (typeof m.a === 'string') { const l = links.get(m.id); if (l && l.pc.signalingState === 'have-local-offer') l.gotAnswer = 1, l.remoteTypes(m.a), l.pc.setRemoteDescription({ type: 'answer', sdp: m.a }).catch(() => killLink(m.id, true)); }
       } else if (sub.startsWith('s/')) { /* signalling for someone else */ }
       else if (sub === 'bye') { gone.set(m.id, Date.now()); drop(m.id); }
       else if (sub.startsWith('e/')) { const v = peers.get(m.id); if (v) v.heard = Date.now(); deliver(sub.slice(2), m.d, m.id); }
@@ -1383,6 +1391,15 @@ if (typeof module !== 'undefined') module.exports = SIM;
       rtt: () => rtt,
       linkMs: () => { let m = 0; for (const l of links.values()) if (l.ready && l.ms) m = Math.max(m, l.ms); return m; },
       get broker() { return BROKERS[brokerIdx]; },
+      diag: () => ({
+        rtc: HAS_RTC, turn: turnOk ? 'OK' : turnErr, broker: (BROKERS[brokerIdx] || '').replace(/^wss:\/\/|:\d+.*$/g, ''), rtt,
+        peers: [...peers.keys()].filter(id => id !== myId).map(id => {
+          const l = links.get(id);
+          return { id, dial: myId < id, tries: tries.get(id) || 0,
+            state: l ? (l.ready ? (l.relay ? 'Cloudflare' : 'trực tiếp') + (l.ms ? ' ' + l.ms + 'ms' : '') : 'đang nối (' + l.pc.connectionState + '/' + l.pc.iceConnectionState + ')') : 'chưa nối',
+            fail: lastFail.get(id) || '' };
+        }),
+      }),
       _start: start,
       get _dbg() { return { myId, ok, broker: BROKERS[brokerIdx], peers: [...peers.keys()] }; },
     };
@@ -2284,9 +2301,10 @@ function updateHud() {
     const ms2 = app.nroom.rtt(), lk = app.nroom.links ? app.nroom.links() : { ready: 0, total: 0 }, nt = $('netTag');
     nt.style.display = '';
     const lms = app.nroom.linkMs ? app.nroom.linkMs() : 0;
-    if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
+    if (!lk.total) { nt.textContent = '👤 Chỉ có mình bạn'; nt.style.background = '#3a4660'; nt.title = 'Chưa có ai khác trong phòng'; }
+    else if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
     else if (lk.ready) { nt.textContent = `⚡ ${lk.ready}/${lk.total} trực tiếp`; nt.style.background = '#5a6a1a'; nt.title = 'Một số người đi qua máy chủ trung chuyển'; }
-    else if (ms2) { nt.textContent = '☁️ ' + ms2 + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
+    else if (ms2 || 1) { nt.textContent = '☁️ ' + (ms2 || '…') + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
   }
   const mi = MAP_INFO[S?.mp]; $('mapTag').textContent = mi ? mi.name + ({ 19: ' · Vừa', 23: ' · Siêu lớn' }[S.W] || '') : '';
   // role
@@ -2526,6 +2544,24 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && app.isHost && app.mode === 'online' && host.hiddenAt && Date.now() - host.hiddenAt > 3000) toast('Bạn là host: hạn chế chuyển tab/thoát app khi đang chơi để cả phòng không bị giật', 4000);
   host.hiddenAt = document.hidden ? Date.now() : 0;
 });
+
+// tap the network badge for a connection report the player can screenshot
+function netReport() {
+  const d = app.nroom && app.nroom.diag && app.nroom.diag(); if (!d) return;
+  const L = ['📶 KẾT NỐI', 'WebRTC: ' + (d.rtc ? 'có' : 'KHÔNG (trình duyệt chặn)'), 'Cloudflare TURN: ' + d.turn, 'Máy chủ phòng: ' + d.broker + ' · ' + (d.rtt || '?') + 'ms'];
+  if (!d.peers.length) L.push('(chưa có ai khác trong phòng)');
+  for (const p of d.peers) { L.push('— ' + peerName(p.id) + ': ' + p.state + (p.tries ? ' · thử ' + p.tries + ' lần' : '') + (p.dial ? '' : ' · máy kia gọi')); if (p.fail) L.push('   lần lỗi gần nhất: ' + p.fail); }
+  let box = $('netBox');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'netBox';
+    box.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:60;background:#0e1626ee;color:#e8f0ff;border:2px solid #4a6a9a;border-radius:12px;padding:12px 14px;font:13px/1.45 system-ui,sans-serif;white-space:pre-wrap;max-width:min(92vw,560px);max-height:70vh;overflow:auto;box-shadow:0 8px 30px #0008';
+    box.onclick = () => { box.style.display = 'none'; clearInterval(box.t); };
+    document.body.appendChild(box);
+  }
+  box.textContent = L.join('\n') + '\n\n(chạm để đóng)'; box.style.display = 'block';
+  clearInterval(box.t); box.t = setInterval(() => { if (box.style.display !== 'none') { const keep = box.style.display; netReport(); box.style.display = keep; } }, 1500);
+}
+if ($('netTag')) { $('netTag').style.cursor = 'pointer'; $('netTag').addEventListener('click', e => { e.stopPropagation(); netReport(); }); }
 
 // ---------- pause ----------
 function togglePause() {

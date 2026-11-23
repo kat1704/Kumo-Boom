@@ -135,6 +135,22 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 .pauseov button{margin-top:10px;font-size:20px;padding:8px 22px}
 .seat .its .pwr{color:#ffe14d;animation:bmPulse2 .6s infinite}
 @keyframes bmPulse2{50%{opacity:.5}}
+#inviteBox{display:flex;flex-direction:column;gap:4px}
+.ivrow{display:flex;gap:6px}.ivrow input{flex:1;min-width:0;font-size:13px;color:#bfe9ff}
+.ivc{font-size:13px;color:var(--mut)}
+#center .ivcenter{margin:10px auto 0;display:inline-flex;gap:6px;align-items:center;background:rgba(10,18,34,.9);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:6px 8px;pointer-events:auto}
+#center .ivcenter input{width:min(360px,60vw);font-size:14px;color:#bfe9ff}
+.plist{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.pchip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:12px;background:#1c2b48;border:2px solid rgba(255,255,255,.12);cursor:grab;user-select:none;font-size:15px}
+.pchip small{color:var(--mut);font-size:12px}.pchip.seated{background:#16324a}.pchip.picked{border-color:#ffd36b!important;box-shadow:0 0 12px rgba(255,211,107,.5)}
+.phint{font-size:13px;color:var(--mut);margin-bottom:4px}
+.seatCfg .sc.drop{flex-direction:column;align-items:stretch;gap:4px;border:2px dashed rgba(255,255,255,.15);cursor:pointer}
+.seatCfg .sc.drop.armed{border-color:rgba(255,211,107,.6)}
+.seatCfg .sc.drop.over{border-color:var(--c);background:rgba(255,255,255,.08)}
+.sch{display:flex;align-items:center;gap:6px;font-size:14px}.sch i{color:var(--mut);font-size:12px;font-style:normal;margin-left:auto}
+.scr{display:flex;gap:6px;align-items:center}.scr select{flex:1}
+.occ{flex:1;font-weight:700;padding:5px 8px;border-radius:9px;background:rgba(255,255,255,.07);border-left:4px solid var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unseat{padding:4px 9px;background:#5a2a36}
 .igf{grid-column:1/-1;font-size:15.5px;color:#ffe08a;border-top:1px dashed rgba(255,255,255,.12);padding-top:6px;margin-top:2px}
 .stbl td.pts{color:#ffd36b}
 .sboard{margin:10px auto 8px;width:min(420px,calc(100vw - 40px));background:rgba(10,18,34,.88);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:8px 12px;text-align:left}
@@ -164,12 +180,16 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 #keyHint{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;font-size:13px;color:#cfe0ff;background:rgba(10,18,34,.7);border:1px solid var(--line);border-radius:99px;padding:4px 14px;pointer-events:none;z-index:4;white-space:nowrap;transition:opacity .6s}
 @media (max-width:700px){.hgrid{grid-template-columns:1fr}.hk span{white-space:normal}}
 #toast{left:50%;top:76px;transform:translateX(-50%);padding:8px 16px;display:none;z-index:30;font-weight:700}
-#touch{position:fixed;inset:auto 0 0 0;height:190px;display:none;z-index:6;pointer-events:none}
-#touch .pad{position:absolute;left:18px;bottom:18px;width:150px;height:150px;pointer-events:auto}
-#touch .pad button{position:absolute;width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.14);font-size:22px;padding:0}
+#touch{position:fixed;inset:auto 0 0 0;height:230px;display:none;z-index:6;pointer-events:none}
+#touch .joyzone{position:absolute;left:0;bottom:0;width:55%;height:100%;pointer-events:auto;touch-action:none}
+#touch .joy{position:absolute;left:24px;bottom:24px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.10),rgba(255,255,255,.18));border:2px solid rgba(255,255,255,.28);box-shadow:inset 0 0 20px rgba(0,0,0,.25);transition:opacity .2s}
+#touch .joyarr{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:14px;color:rgba(255,255,255,.45)}
+#touch .joyarr.d{top:auto;bottom:6px}#touch .joyarr.l{left:10px;top:50%;transform:translateY(-50%)}#touch .joyarr.r{left:auto;right:10px;top:50%;transform:translateY(-50%)}
+#touch .knob{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffff,#9fdcff 50%,#3a8fd8);box-shadow:0 4px 12px rgba(0,0,0,.45);transition:transform .06s}
+#touch .joy.active{border-color:rgba(127,224,255,.8)}
 #touch .acts{position:absolute;right:18px;bottom:24px;display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
-#touch .acts button{width:84px;height:84px;border-radius:50%;font-size:32px;background:rgba(79,195,255,.35)}
-#touch .acts button.n{width:58px;height:58px;font-size:22px;background:rgba(255,255,255,.16)}
+#touch .acts button{width:96px;height:96px;border-radius:50%;font-size:38px;background:rgba(79,195,255,.42);box-shadow:0 4px 0 rgba(0,0,0,.3);touch-action:none}
+#touch .acts button.n{width:64px;height:64px;font-size:24px;background:rgba(255,255,255,.18)}
 .floatE{position:fixed;font-size:34px;pointer-events:none;z-index:7;animation:floatUp 2.2s ease-out forwards;text-align:center}
 .floatE small{display:block;font-size:11px;color:#fff;text-shadow:0 1px 3px #000}
 @keyframes floatUp{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-20px) scale(1.1)}100%{transform:translateY(-200px) scale(1);opacity:0}}
@@ -200,6 +220,63 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   #hostPanel{top:8px}
   #center .big{font-size:80px}#center .res{font-size:32px}
 }
+
+#rotate{display:none;position:fixed;inset:0;z-index:40;background:rgba(5,10,20,.92);align-items:center;justify-content:center;text-align:center}
+.rotbox{display:flex;flex-direction:column;gap:10px;align-items:center;padding:20px}
+.rotic{font-size:64px;animation:rotSpin 2s ease-in-out infinite}
+@keyframes rotSpin{0%,20%{transform:rotate(0)}50%,70%{transform:rotate(90deg)}100%{transform:rotate(0)}}
+.rott{font-size:22px;font-weight:800}.rots{font-size:15px;color:var(--mut)}
+.rotbox button{font-size:16px;padding:10px 18px;width:260px}
+@media (orientation:portrait) and (max-width:700px){ body.touchdev:not(.portraitok) #rotate{display:flex} }
+/* ===== phone held sideways ===== */
+@media (orientation:landscape) and (max-height:560px){
+  #top{left:6px;right:6px;top:4px;height:42px;padding:0 6px;gap:5px;flex-wrap:nowrap;border-radius:10px}
+  #logo{font-size:14px;white-space:nowrap}#roomTag{display:none}
+  #top button,#timer{white-space:nowrap}
+  #timer{font-size:15px!important}#mapTag{font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+  #timer{font-size:16px;min-width:56px;margin:0 auto}
+  #roleBadge{display:none}
+  #roleBtns{gap:3px;width:auto;flex-wrap:nowrap;justify-content:flex-end}
+  #roleBtns button{padding:3px 7px;font-size:12px}
+  #bPause{width:34px;height:34px;font-size:17px;margin-left:0}
+  #bInvite{padding:3px 7px;font-size:12px}
+  #left{left:6px;top:50px!important;right:auto;bottom:auto;width:160px;flex-direction:column;padding:4px;gap:3px;max-height:none}
+  #seats{flex-direction:column!important;gap:3px!important}
+  #left .seat{padding:2px 5px;flex:none}
+  #left .seat .dot{display:none}
+  #left .seat .mid .nm{font-size:11px;max-width:100px}
+  #left .seat .sub{display:none}
+  #left .seat .its{display:flex;font-size:10px;gap:0 4px}
+  #left .seat .wins{position:static;font-size:11px}
+  #left .sect,#specs,#stats{display:none}
+  #traitBar{display:none!important}
+  #banner{top:50px!important;bottom:auto;max-width:44%;min-width:0;font-size:12.5px;padding:3px 10px}
+  #banner .who{font-size:9px}
+  #right.show{top:50px;bottom:6px;height:auto;left:auto;right:6px;width:300px}
+  #hostPanel{top:48px;max-height:calc(100% - 54px)}
+  #helpBox,#statsBox{max-height:calc(100% - 12px)}
+  #center .big{font-size:56px}
+  #center .iguide{display:none}
+  .mapinfo{font-size:12px;padding:5px 10px;margin-top:6px}.mapinfo b{font-size:14px}
+  .pick{padding:6px 10px}.pkt{font-size:17px}.pks{font-size:15px;min-width:40px}.pkh{font-size:11px}
+  .pkb{margin-top:6px;gap:6px}.pkb button{padding:5px 4px}.pkb button small{display:none}.pkb button b{font-size:13px}.pki{font-size:22px}.pki .ico{width:28px;height:28px}
+  .pkl{font-size:12px;margin-top:5px}
+  .sboard{display:none}.wincard img{height:70px}.wincard{min-width:110px;padding:5px 8px}.wpn{font-size:16px}#center .res{font-size:26px}
+  #touch{inset:50px 0 0 0;height:auto}
+  #touch .joyzone{width:42%;height:100%}
+  #touch .joy{left:16px;bottom:12px;width:124px;height:124px}
+  #touch .knob{width:54px;height:54px;margin:-27px 0 0 -27px}
+  #touch .acts{right:12px;bottom:12px;flex-direction:column-reverse;align-items:center;gap:8px}
+  #touch .acts button{width:88px;height:88px;font-size:34px}
+  #touch .acts button.n{width:56px;height:56px}
+  #keyHint{display:none}
+  #toast{top:50px}
+}
+@media (orientation:landscape) and (max-height:560px) and (max-width:900px){
+  #logo{display:none}
+  #mapTag{max-width:90px}
+  #roleBtns button{padding:3px 6px;font-size:11.5px}
+}
 </style>
 </head>
 <body>
@@ -222,6 +299,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <button id="bHelp" title="Hướng dẫn nút bấm (H)">❓</button>
     <button id="bTts" title="Đọc bình luận bằng giọng nói">🔇</button>
     <button id="chatToggle" style="display:none">💬</button>
+    <button id="bFull" style="display:none" title="Toàn màn hình, xoay ngang">⛶</button>
   </div>
 </div>
 
@@ -236,6 +314,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 </div>
 
 <div id="right" class="panel">
+  <div id="inviteBox" style="display:none"><div class="sect">🔗 Link mời vào phòng</div><div class="ivrow"><input id="inviteIn" readonly><button id="inviteCopy" class="pri">Copy</button></div><div id="roomCount" class="ivc"></div></div>
   <div class="sect">Bình luận & diễn biến</div>
   <div id="feed"></div>
   <div id="reacts"></div>
@@ -264,7 +343,11 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <label><input type="checkbox" id="hpAuto" checked> Tự sang ván mới</label>
     <label><input type="checkbox" id="hpAutoCm" checked> Bình luận tự động</label>
     <label><input type="checkbox" id="hpNpc" checked> ⛈️ Ông Mây Giông thả bom</label></div>
-  <div class="sect">Ghế ngồi (người chơi vào sẽ thay bot / ghế trống)</div>
+  <div class="sect">👥 Người trong phòng</div>
+  <div id="hpPeople" class="plist"></div>
+  <div id="hpPickHint" class="phint"></div>
+  <div class="row"><label><input type="checkbox" id="hpAutoSeat" checked> Tự xếp người muốn chơi vào ghế trống / ghế bot</label></div>
+  <div class="sect">🎮 Ghế chơi (thả người vào đây)</div>
   <div class="seatCfg" id="hpSeats"></div>
   <div class="row" style="margin-top:10px">
     <button class="pri" id="hpStart">▶ Bắt đầu ván</button>
@@ -297,6 +380,14 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 </div>
 
 <div id="toast" class="panel"></div>
+
+<div id="rotate"><div class="rotbox">
+  <div class="rotic">📱↻</div>
+  <div class="rott">Xoay ngang điện thoại để chơi</div>
+  <div class="rots">Màn hình ngang rộng hơn, dễ điều khiển hơn</div>
+  <button class="pri" id="rotGo">⛶ Toàn màn hình + xoay ngang</button>
+  <button id="rotSkip">Vẫn chơi màn hình dọc</button>
+</div></div>
 
 <div id="statsBox" class="panel">
   <div class="row" style="justify-content:space-between;margin:0 0 6px"><h3>📊 Thông số item của từng nhân vật</h3><button id="statsClose">✕</button></div>
@@ -355,12 +446,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 </div>
 
 <div id="touch">
-  <div class="pad">
-    <button data-d="up" style="left:49px;top:0">▲</button>
-    <button data-d="left" style="left:0;top:49px">◀</button>
-    <button data-d="right" style="left:98px;top:49px">▶</button>
-    <button data-d="down" style="left:49px;top:98px">▼</button>
-  </div>
+  <div class="joyzone" id="joyZone"><div class="joy" id="joy"><div class="joyarr">▲</div><div class="joyarr r">▶</div><div class="joyarr d">▼</div><div class="joyarr l">◀</div><div class="knob" id="knob"></div></div></div>
   <div class="acts"><button class="n" id="tNeedle">📌</button><button id="tBomb">💧</button></div>
 </div>
 
@@ -1097,7 +1183,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       for (const id of [...peers.keys()]) drop(id); // includes our old id: we get a new one on rejoin
       myId = null;
       try { peer && peer.destroy(); } catch (e) { /* ignore */ }
-      peer = null; hubConn = null;
+      peer = null; hubConn = null; isHub = false;
       clearTimeout(retryT);
       retryT = setTimeout(() => start().catch(() => {}), 400 + Math.random() * 1600); // someone becomes the new hub
     }
@@ -1115,6 +1201,11 @@ if (typeof module !== 'undefined') module.exports = SIM;
           setPres(myId, myPres); setOk(true); finish();
         });
         hp.on('error', err => {
+          if (err && err.type === 'unavailable-id' && done && isHub) {
+            // we lost the room id while disconnected and someone else claimed it: merge into their room
+            isHub = false; for (const c of clients.values()) { try { c.close(); } catch (e) { /* ignore */ } } clients.clear();
+            lostHub(); return;
+          }
           if (err && err.type === 'unavailable-id') {
             try { hp.destroy(); } catch (e) { /* ignore */ }
             // 2) room exists: join it as a client
@@ -1137,7 +1228,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
             cp.on('disconnected', () => { try { cp.reconnect(); } catch (e) { /* ignore */ } });
           } else if (!done) finish({ code: 'upstream_error', message: String(err && err.type || err) });
         });
-        hp.on('disconnected', () => { if (isHub) { try { hp.reconnect(); } catch (e) { /* ignore */ } } });
+        hp.on('disconnected', () => { if (isHub && !left) setTimeout(() => { try { if (!hp.destroyed) hp.reconnect(); } catch (e) { /* ignore */ } }, 300); });
       });
     }
 
@@ -1149,6 +1240,10 @@ if (typeof module !== 'undefined') module.exports = SIM;
       else send(hubConn, { t: 'pres', p: myPres });
     }
 
+    setInterval(() => {
+      if (left || !peer) return;
+      if (peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch (e) { /* ignore */ } }
+    }, 4000);
     const api = {
       name,
       async presence(patch) {
@@ -1170,6 +1265,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
       async leave() { left = true; clearTimeout(retryT); try { peer && peer.destroy(); } catch (e) { /* ignore */ } setOk(false); },
       _start: start,
+      count: () => peers.size,
       get _dbg() { return { isHub, myId, ok, peers: [...peers.keys()], clients: [...clients.keys()] }; },
     };
     window.addEventListener('beforeunload', () => { left = true; try { peer && peer.destroy(); } catch (e) { /* ignore */ } });
@@ -1271,9 +1367,13 @@ function layout() {
   VW = window.innerWidth; VH = window.innerHeight;
   cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
   const wide = VW > 1100, touch = $('touch').style.display === 'block';
-  const left = wide ? 260 : 8, right = wide ? 314 : 8;
+  const land = !wide && VW > VH && VH <= 560; // phone held sideways
+  let left = wide ? 260 : 8, right = wide ? 314 : 8;
   let top = 70, bottom = wide ? 70 : (touch ? 200 : 16);
-  if (!wide) {
+  if (land) {
+    left = 172; right = touch ? 128 : 12; top = 50; bottom = 6;
+    $('left').style.top = ''; $('banner').style.top = ''; if ($('traitBar')) $('traitBar').style.top = '';
+  } else if (!wide) {
     const tb = $('top').getBoundingClientRect().bottom;
     $('left').style.top = (tb + 6) + 'px';
     top = $('left').getBoundingClientRect().bottom + 8;
@@ -2048,6 +2148,7 @@ function updateHud() {
     }
   }
   const specHtml = specs.length ? specs.map(esc).join('<br>') : '—';
+  if (IS_WEB && app.mode === 'online') { const n = app.peers.length; const rc = $('roomCount'); const txt = `Phòng "${app.code}" đang có ${n} người${n <= 1 ? ' — chỉ có mình bạn, gửi link mời cho bạn bè nhé!' : ''}`; if (rc.textContent !== txt) rc.textContent = txt; }
   const tbl = statsTable(S, false), big = $('statsBox').style.display === 'block' ? statsTable(S, true) : '';
   const key = html + specHtml + tbl + big;
   if (key !== lastHud) { lastHud = key; $('seats').innerHTML = html; $('specs').innerHTML = specHtml; $('stats').innerHTML = tbl; if (big) $('statsBody').innerHTML = big; }
@@ -2094,7 +2195,7 @@ function updateCenter(S, now) {
   } else if (S) {
     if (S.ph === 'pick') h = pickHTML(S) + mapInfoHTML(S) + itemGuideHTML();
     else if (S.ph === 'count') h = `<div class="big">${Math.max(1, Math.ceil(S.t))}</div>` + mapInfoHTML(S) + itemGuideHTML();
-    else if (S.ph === 'lobby') h = `<div class="sm">${app.isHost ? 'Mở ⚙️ bảng host và bấm <b>Bắt đầu ván</b>' : 'Đang chờ host bắt đầu ván…'}</div>` + mapInfoHTML(S) + itemGuideHTML();
+    else if (S.ph === 'lobby') h = `<div class="sm">${app.isHost ? 'Mở ⚙️ bảng host và bấm <b>Bắt đầu ván</b>' : 'Đang chờ host bắt đầu ván…'}</div>` + (IS_WEB && app.mode === 'online' ? `<div class="ivcenter">🔗 <input readonly value="${esc(inviteLink())}" onfocus="this.select()"><button class="pri" data-copyinv="1">Copy link mời</button></div>` : '') + mapInfoHTML(S) + itemGuideHTML();
     else if (S.ph === 'end') {
       let t = '🤝 Hoà!';
       if (S.wn >= 0) {
@@ -2106,7 +2207,7 @@ function updateCenter(S, now) {
       h = `<div class="res">${t}</div>${board}<div class="sm">${S.auto ? 'Ván mới sau ' + Math.max(0, Math.ceil(S.t)) + ' giây…' : 'Chờ host mở ván mới'}</div>`;
     }
   }
-  if (c._h !== h) { c._h = h; c.innerHTML = h; c.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { ac(); setTrait(b.dataset.pick); }); const rb = c.querySelector('[data-resume]'); if (rb) rb.onclick = () => togglePause(); }
+  if (c._h !== h) { c._h = h; c.innerHTML = h; c.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { ac(); setTrait(b.dataset.pick); }); const rb = c.querySelector('[data-resume]'); if (rb) rb.onclick = () => togglePause(); const cb = c.querySelector('[data-copyinv]'); if (cb) cb.onclick = () => $('inviteCopy').click(); }
 }
 
 // ---------- feed / chat / commentary ----------
@@ -2172,11 +2273,52 @@ window.addEventListener('keyup', e => { if (!visible) return; if (EMBED) e.stopI
 window.addEventListener('blur', () => { dirStack.length = 0; applyDir(); });
 // touch
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) $('touch').style.display = 'block';
-document.querySelectorAll('#touch .pad button').forEach(b => {
-  const d = b.dataset.d;
-  b.addEventListener('pointerdown', e => { e.preventDefault(); ac(); pressDir(d); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, () => releaseDir(d)));
-});
+// phones: suggest landscape + fullscreen button
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  document.body.classList.add('touchdev');
+  if (!EMBED) $('bFull').style.display = '';
+}
+async function goLandscape() {
+  ac();
+  const el = document.documentElement;
+  try { if (!document.fullscreenElement && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* ignore */ }
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) { /* ignore */ }
+  setTimeout(() => { if (window.innerHeight > window.innerWidth) toast('Hãy xoay ngang điện thoại (bật xoay màn hình nếu đang khoá)', 3500); layout(); }, 400);
+}
+$('bFull').onclick = () => { if (document.fullscreenElement) { document.exitFullscreen?.(); } else goLandscape(); };
+$('rotGo').onclick = () => { document.body.classList.add('portraitok'); goLandscape(); };
+$('rotSkip').onclick = () => { document.body.classList.add('portraitok'); setTimeout(layout, 50); };
+window.addEventListener('orientationchange', () => setTimeout(layout, 300));
+
+// virtual joystick (floating: press anywhere in the lower-left area, drag to move)
+(() => {
+  const zone = $('joyZone'), joy = $('joy'), knob = $('knob'); if (!zone) return;
+  let pid = null, cx = 0, cy = 0, cur = null;
+  let R = 70; const DEAD = 14;
+  const setDir = d => { if (d === cur) return; cur = d; dirStack.length = 0; if (d) dirStack.push(d); applyDir(); if (d && navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* ignore */ } } };
+  const place = (x, y) => { const zr = zone.getBoundingClientRect(); joy.style.left = (x - zr.left - R) + 'px'; joy.style.top = (y - zr.top - R) + 'px'; joy.style.bottom = 'auto'; cx = x; cy = y; };
+  const reset = () => { pid = null; knob.style.transform = ''; joy.classList.remove('active'); setDir(null); joy.style.left = ''; joy.style.top = ''; joy.style.bottom = ''; };
+  zone.addEventListener('pointerdown', e => {
+    e.preventDefault(); ac();
+    if (pid !== null) return;
+    pid = e.pointerId; try { zone.setPointerCapture(pid); } catch (er) { /* ignore */ }
+    R = joy.offsetWidth / 2 || 70;
+    const jr = joy.getBoundingClientRect();
+    const inside = Math.hypot(e.clientX - (jr.left + R), e.clientY - (jr.top + R)) < R;
+    if (inside) { cx = jr.left + R; cy = jr.top + R; } else place(e.clientX, e.clientY);
+    joy.classList.add('active'); move(e);
+  });
+  function move(e) {
+    if (e.pointerId !== pid) return;
+    let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy);
+    if (d > R) { dx = dx / d * R; dy = dy / d * R; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    if (d < DEAD) return setDir(null);
+    setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  }
+  zone.addEventListener('pointermove', move);
+  ['pointerup', 'pointercancel'].forEach(t => zone.addEventListener(t, e => { if (e.pointerId === pid) reset(); }));
+})();
 $('tBomb').addEventListener('pointerdown', e => { e.preventDefault(); ac(); pressBomb(); });
 $('tNeedle').addEventListener('pointerdown', e => { e.preventDefault(); pressNeedle(); });
 
@@ -2237,7 +2379,7 @@ function firstHelp() { if (store.get('helpSeen', '') !== '1') setTimeout(() => t
 const host = {
   g: null, seats: null, seed: 0, mode: 'ffa', paused: false, size: 'normal', mapSel: 'random', curMap: 'classic', npc: true, hostPlays: false, auto: true, autoCm: true,
   lastIn: {}, wins: [0, 0, 0, 0], score: [0, 0, 0, 0], botTraits: ['b', 's', 'f', 'n'], occ: ['', '', '', ''], evId: 0, rk: 0, tick: 0, timer: 0,
-  cmQueue: [], cmLast: 0, cmId: 0, seenEv: 0, kicked: new Set(),
+  cmQueue: [], cmLast: 0, cmId: 0, seenEv: 0, kicked: new Set(), forced: new Map(), autoSeat: true, pick: null,
 };
 function defaultSeats() { return [0, 1, 2, 3].map(i => ({ type: 'bot', peer: null, name: BOT_NAMES[i] })); }
 function seatTrait(i) {
@@ -2312,8 +2454,10 @@ function hostSeatMaintenance() {
   if (app.mode === 'online') for (const p of app.peers) {
     if (p.sameTab || p.kind !== 'viewer') continue;
     const pr = p.presence || {};
+    if (host.forced.has(p.peer) && (pr.wv || 0) !== host.forced.get(p.peer)) host.forced.delete(p.peer); // they pressed Chơi/Xem themselves since
+    if (host.forced.has(p.peer)) { wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi' }); continue; }
     if (pr.want !== 'play') host.kicked.delete(p.peer);
-    else if (!host.kicked.has(p.peer)) wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi' });
+    else if (!host.kicked.has(p.peer)) wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi', auto: true });
   }
   const wantSet = new Set(wanting.map(w => w.peer));
   let changed = false;
@@ -2328,7 +2472,7 @@ function hostSeatMaintenance() {
       if (w && w.name !== s.name) { s.name = w.name; if (g && g.players[i]) g.players[i].name = w.name; changed = true; }
     }
   });
-  if (canSeat) {
+  if (canSeat && host.autoSeat) {
     for (const w of wanting) {
       if (host.seats.some(s => s.type === 'human' && s.peer === w.peer)) continue;
       let k = host.seats.findIndex(s => s.type === 'empty');
@@ -2342,6 +2486,46 @@ function hostSeatMaintenance() {
   if (changed) { if (g && g.phase === 'lobby') hostRebuildLobby(); else if (g && g.phase === 'pick') hostRebuildPick(g.t, 'pick'); renderHostPanel(); }
   else if (g && g.phase === 'lobby' && !sameNames(g)) hostRebuildLobby();
   else if (g && g.phase === 'pick' && !sameNames(g)) hostRebuildPick(g.t, 'pick');
+}
+function peerName(id) {
+  if (id === app.myPeer) return app.name || 'Host';
+  const p = app.peers.find(q => q.peer === id); return clean(p?.presence?.n, 16) || 'Người chơi';
+}
+function applySeatToGame(i) {
+  const g = host.g, s = host.seats[i]; if (!g) return;
+  if (g.phase === 'lobby') return hostRebuildLobby();
+  if (g.phase === 'pick') return hostRebuildPick(g.t, 'pick');
+  const p = g.players[i];
+  if (!p) { if (s.type === 'human') toast(`${s.name} sẽ vào ghế ${i + 1} từ ván sau`, 2200); return; }
+  if (s.type === 'human') { p.bot = false; p.name = s.name; } else { p.bot = true; p.name = s.name || BOT_NAMES[i]; }
+}
+// host drags / taps a person into a seat
+function hostAssign(peer, k) {
+  if (!app.isHost || k < 0 || k > 3) return;
+  const from = host.seats.findIndex(s => s.type === 'human' && s.peer === peer);
+  if (from === k) return;
+  const target = host.seats[k];
+  const name = peerName(peer);
+  if (from >= 0) {
+    // move / swap seats
+    host.seats[from] = target.type === 'human' ? target : { type: 'bot', peer: null, name: BOT_NAMES[from] };
+    applySeatToGame(from);
+  } else if (target.type === 'human' && target.peer) {
+    // displaced player goes back to the waiting list
+    if (target.peer === app.myPeer) host.hostPlays = false; else { host.kicked.add(target.peer); host.forced.delete(target.peer); }
+  }
+  host.seats[k] = { type: 'human', peer, name };
+  if (peer === app.myPeer) { host.hostPlays = true; app.role = 'play'; }
+  else { host.kicked.delete(peer); const pr = app.peers.find(q => q.peer === peer)?.presence || {}; host.forced.set(peer, pr.wv || 0); }
+  applySeatToGame(k);
+  addFeed(`🎙️ Host xếp ${name} vào ghế ${k + 1}`, 'sys');
+  renderHostPanel(true);
+}
+function hostUnseat(k) {
+  const s = host.seats[k]; if (s.type !== 'human') return;
+  if (s.peer === app.myPeer) { host.hostPlays = false; app.role = 'watch'; } else { host.kicked.add(s.peer); host.forced.delete(s.peer); }
+  host.seats[k] = { type: 'bot', peer: null, name: BOT_NAMES[k] };
+  applySeatToGame(k); renderHostPanel(true);
 }
 function sameNames(g) { return g.players.every((p, i) => (p ? p.name + '|' + p.trait : null) === (host.seats[i].type === 'empty' ? null : host.seats[i].name + '|' + seatTrait(i))); }
 
@@ -2427,36 +2611,77 @@ function hostComment(text) {
 }
 
 // host panel
-function renderHostPanel() {
+let hpKey = '', hpDragging = false;
+function roomPeople() {
+  const list = [];
+  const me = { id: app.myPeer, name: (app.name || 'Host') + ' (bạn)', want: host.hostPlays ? 'play' : 'watch' };
+  list.push(me);
+  if (app.mode === 'online') for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer') list.push({ id: p.peer, name: clean(p.presence?.n, 16) || 'Ai đó', want: p.presence?.want });
+  return list;
+}
+function renderHostPanel(force) {
   if (!app.isHost) return;
-  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; $('hpNpc').checked = host.npc; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays;
+  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; $('hpNpc').checked = host.npc; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
+  const people = roomPeople();
+  const key = JSON.stringify([host.seats, people, host.pick]);
+  if (!force && (key === hpKey || hpDragging)) return;
+  hpKey = key;
+  // people list
+  const pl = $('hpPeople'); pl.innerHTML = '';
+  for (const pe of people) {
+    const seat = host.seats.findIndex(s => s.type === 'human' && s.peer === pe.id);
+    const chip = document.createElement('div');
+    chip.className = 'pchip' + (seat >= 0 ? ' seated' : '') + (host.pick === pe.id ? ' picked' : '');
+    chip.draggable = true;
+    chip.innerHTML = `<span class="pst">${seat >= 0 ? '🎮' : pe.want === 'play' ? '⏳' : '👀'}</span><b></b><small>${seat >= 0 ? 'Ghế ' + (seat + 1) : pe.want === 'play' ? 'Muốn chơi' : 'Đang xem'}</small>`;
+    chip.querySelector('b').textContent = pe.name;
+    if (seat >= 0) chip.style.borderColor = COLORS[seat];
+    chip.addEventListener('dragstart', e => { hpDragging = true; e.dataTransfer.setData('text/plain', pe.id); e.dataTransfer.effectAllowed = 'move'; });
+    chip.addEventListener('dragend', () => { hpDragging = false; renderHostPanel(true); });
+    chip.onclick = () => { host.pick = host.pick === pe.id ? null : pe.id; renderHostPanel(true); };
+    pl.appendChild(chip);
+  }
+  $('hpPickHint').textContent = host.pick ? `Đã chọn "${peerName(host.pick)}" — bấm vào một ghế bên dưới để xếp vào.` : 'Kéo tên vào ghế (máy tính), hoặc bấm tên rồi bấm ghế (điện thoại).';
+  // seats
   const box = $('hpSeats'); box.innerHTML = '';
   host.seats.forEach((s, i) => {
-    const d = document.createElement('div'); d.className = 'sc';
-    const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = COLORS[i]; d.appendChild(dot);
-    const sel = document.createElement('select');
-    const opts = [['bot', '🤖 Bot'], ['empty', '— Trống (chờ người)']];
-    if (s.type === 'human') opts.unshift(['human', '👤 ' + s.name]);
-    for (const [v, t] of opts) { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); }
-    sel.value = s.type;
-    sel.onchange = () => {
-      if (sel.value === 'bot') host.seats[i] = { type: 'bot', peer: null, name: BOT_NAMES[i] };
-      else if (sel.value === 'empty') host.seats[i] = { type: 'empty', peer: null, name: '' };
-      if (s.type === 'human' && s.peer) {
-        if (s.peer === app.myPeer) { host.hostPlays = false; app.role = 'watch'; }
-        else { host.kicked.add(s.peer); toast('Đã đưa ' + s.name + ' ra khỏi ghế (họ vẫn xem; bấm Chơi lại để xin vào).'); }
-        if (host.g.players[i] && host.g.phase !== 'lobby') host.g.players[i].bot = true;
-      }
-      if (host.g.phase === 'lobby') hostRebuildLobby();
-      renderHostPanel();
-    };
-    d.appendChild(sel); box.appendChild(d);
+    const d = document.createElement('div'); d.className = 'sc drop' + (host.pick ? ' armed' : '');
+    d.style.setProperty('--c', COLORS[i]);
+    const head = document.createElement('div'); head.className = 'sch';
+    head.innerHTML = `<span class="dot" style="background:${COLORS[i]}"></span><b>Ghế ${i + 1}</b><i>${CHAR_NAMES[i]}</i>`;
+    d.appendChild(head);
+    const row = document.createElement('div'); row.className = 'scr';
+    if (s.type === 'human') {
+      const who = document.createElement('span'); who.className = 'occ'; who.textContent = '👤 ' + s.name; row.appendChild(who);
+      const x = document.createElement('button'); x.className = 'unseat'; x.textContent = '✕'; x.title = 'Đưa ra khỏi ghế'; x.onclick = ev => { ev.stopPropagation(); hostUnseat(i); }; row.appendChild(x);
+    } else {
+      const sel = document.createElement('select');
+      for (const [v, t] of [['bot', '🤖 Bot'], ['empty', '— Trống (chờ người)']]) { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); }
+      sel.value = s.type;
+      const takePick = ev => { if (host.pick) { ev.preventDefault(); ev.stopPropagation(); const id = host.pick; host.pick = null; hostAssign(id, i); return true; } ev.stopPropagation(); return false; };
+      sel.addEventListener('pointerdown', takePick); sel.addEventListener('mousedown', ev => { if (host.pick) ev.preventDefault(); });
+      sel.onclick = ev => ev.stopPropagation();
+      sel.onchange = () => {
+        host.seats[i] = sel.value === 'bot' ? { type: 'bot', peer: null, name: BOT_NAMES[i] } : { type: 'empty', peer: null, name: '' };
+        if (host.g.phase === 'lobby') hostRebuildLobby(); else if (host.g.phase === 'pick') hostRebuildPick(host.g.t, 'pick');
+        renderHostPanel(true);
+      };
+      row.appendChild(sel);
+    }
+    d.appendChild(row);
+    d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+    d.addEventListener('dragleave', () => d.classList.remove('over'));
+    d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); hpDragging = false; const id = e.dataTransfer.getData('text/plain'); if (id) hostAssign(id, i); });
+    d.onclick = () => { if (host.pick) { const id = host.pick; host.pick = null; hostAssign(id, i); } };
+    box.appendChild(d);
   });
 }
+setInterval(() => { if (app.isHost && $('hostPanel').style.display === 'block') renderHostPanel(); }, 400);
 $('hpMode').onchange = () => { host.mode = $('hpMode').value; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Chế độ mới áp dụng từ ván sau'); };
 $('hpAuto').onchange = () => host.auto = $('hpAuto').checked;
 $('hpNpc').onchange = () => { host.npc = $('hpNpc').checked; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Áp dụng từ ván sau'); };
 $('hpAutoCm').onchange = () => host.autoCm = $('hpAutoCm').checked;
+$('hpAutoSeat').onchange = () => { host.autoSeat = $('hpAutoSeat').checked; toast(host.autoSeat ? 'Người muốn chơi sẽ tự vào ghế trống' : 'Chỉ host xếp người vào ghế', 2000); };
 $('hpPlay').onchange = () => { host.hostPlays = $('hpPlay').checked; app.role = host.hostPlays ? 'play' : 'watch'; if (app.nroom) app.nroom.presence({ want: app.role }).catch(() => {}); };
 $('hpStart').onclick = () => { ac(); hostSeatMaintenance(); if (!host.g.players.some(Boolean)) return toast('Cần ít nhất 1 ghế có người hoặc bot'); hostNewGame('pick'); };
 $('hpNewMap').onclick = () => { host.seed = (Math.random() * 1e9) | 0; if (host.g.phase === 'lobby') { host.curMap = pickMap(); hostRebuildLobby(); } else hostNewGame('pick'); };
@@ -2570,14 +2795,14 @@ async function enterRoom(role, wantHost, embedRoomName) {
   await app.nroom.presence({ n: app.name, want: role, tr: myTrait, inp: { dx: 0, dy: 0, b: 0, nd: 0 } }).catch(() => {});
   $('start').style.display = 'none'; firstHelp();
   $('roomTag').textContent = EMBED ? 'Kumo Boardgame' : 'Phòng: ' + app.code;
-  if (IS_WEB) { try { history.replaceState(null, '', '#' + app.code); } catch (e) { /* ignore */ } $('bInvite').style.display = ''; }
+  if (IS_WEB) { try { history.replaceState(null, '', '#' + app.code); } catch (e) { /* ignore */ } $('bInvite').style.display = ''; showInvite(); addFeed('🔗 Link mời: ' + inviteLink() + ' — bạn bè mở link này là vào đúng phòng.', 'sys'); }
   addFeed(EMBED ? 'Bạn đã vào sân Boom của hội trường.' : 'Bạn đã vào phòng "' + app.code + '". Gửi link trang này cho bạn bè và nhập cùng mã phòng.', 'sys');
   if (wantHost) setTimeout(() => { if (!app.hostPeer) { startHosting(); $('hostPanel').style.display = 'block'; } else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
 }
 function setRole(role) {
-  app.role = role;
+  app.role = role; app.wv = Date.now();
   if (app.isHost) { host.hostPlays = role === 'play'; $('hpPlay').checked = host.hostPlays; }
-  if (app.nroom) app.nroom.presence({ want: role }).catch(() => {});
+  if (app.nroom) app.nroom.presence({ want: role, wv: app.wv }).catch(() => {});
 }
 $('bPlay').onclick = () => { ac(); setRole('play'); toast(app.S && app.S.ph === 'play' ? 'Bạn sẽ vào ghế ở ván sau' : 'Đang xin vào ghế…'); };
 $('bWatch').onclick = () => setRole('watch');
@@ -2617,6 +2842,13 @@ async function copyInvite() {
   catch (e) { toast('Link mời: ' + link, 6000); }
 }
 $('bInvite').onclick = copyInvite;
+async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch (e) { return false; } }
+$('inviteCopy').onclick = async () => { const i = $('inviteIn'); i.select(); const ok = await copyText(i.value) || (document.execCommand && document.execCommand('copy')); toast(ok ? 'Đã copy link mời! Gửi cho bạn bè qua Zalo / Messenger.' : 'Hãy bôi đen link rồi copy', 2500); };
+$('inviteIn').addEventListener('focus', e => e.target.select());
+function showInvite() {
+  if (!IS_WEB || app.mode !== 'online') return;
+  $('inviteBox').style.display = 'flex'; $('inviteIn').value = inviteLink();
+}
 $('sName').value = store.get('name', '');
 const hashRoom = clean(decodeURIComponent((location.hash || '').slice(1)), 20).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
 $('sRoom').value = hashRoom || store.get('room', 'san-1');

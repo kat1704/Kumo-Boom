@@ -1126,6 +1126,8 @@ if (typeof module !== 'undefined') module.exports = SIM;
   ];
   const NS = 'boom25d-vn1/';
   const HB = 2000, STALE = 9000;
+  const RTC_CFG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: 'stun:stun.cloudflare.com:3478' }] };
+  const HAS_RTC = typeof window.RTCPeerConnection === 'function';
   // fresh id per page load (MQTT keeps it across auto-reconnects; a reload says 'bye' and comes back as a new id)
   const CID = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -1152,6 +1154,12 @@ if (typeof module !== 'undefined') module.exports = SIM;
     const peers = new Map(); // id -> { presence, at, heard }
     let myId = CID, myPres = {}, client = null, ok = false, left = false, presT = 0, lastSent = 0, brokerIdx = 0;
     let J = new Set(), U = new Set(), L = [], fireT = 0;
+    // ---- direct links (WebRTC data channels); MQTT stays as discovery + fallback ----
+    const links = new Map(); // peerId -> { pc, dc, ready }
+    const noRetry = new Map(); // peerId -> time of last failed attempt
+    const lastSeq = new Map(); // peerId -> last presence sequence applied
+    let seq = 0, lastMqtt = 0;
+    const gone = new Map(); // peerId -> time it said goodbye (ignore late packets from it)
 
     const snapshot = () => [...peers.entries()].map(([id, v]) => Object.freeze({ peer: id, by: null, isMe: id === myId, sameTab: id === myId, kind: 'viewer', guest: false, presence: v.presence, updatedAt: v.at }));
     function schedule() { if (!fireT) fireT = setTimeout(fire, 16); }
@@ -1169,6 +1177,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
     }
     function drop(id) {
       const v = peers.get(id); if (!v || id === myId) return;
+      killLink(id); lastSeq.delete(id);
       peers.delete(id); J.delete(id); U.delete(id);
       L.push(Object.freeze({ peer: id, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: v.presence })); schedule();
     }
@@ -1177,7 +1186,66 @@ if (typeof module !== 'undefined') module.exports = SIM;
     }
     function setOk(v) { if (ok !== v) { ok = v; connHandlers.forEach(h => { try { h(v); } catch (e) { /* ignore */ } }); } }
     function pub(sub, obj) { if (client && ok) { try { client.publish(base + sub, enc(obj), { qos: 0, retain: false }); } catch (e) { /* ignore */ } } }
-    function sendPres(hello) { lastSent = Date.now(); pub('p', { id: myId, p: myPres, h: hello ? 1 : 0 }); }
+    function readyLinks() { let n = 0; for (const l of links.values()) if (l.ready) n++; return n; }
+    function sendPres(hello) {
+      const now = Date.now(); lastSent = now;
+      const msg = { id: myId, p: myPres, q: ++seq };
+      const raw = enc(msg);
+      for (const l of links.values()) if (l.ready) { try { l.dc.send(raw); } catch (e) { /* ignore */ } }
+      // over MQTT: always for greetings, for anyone not yet linked, and as a slow heartbeat
+      const allLinked = peers.size - 1 <= readyLinks();
+      if (hello || !allLinked || now - lastMqtt > 1500) { lastMqtt = now; pub('p', hello ? { ...msg, h: 1 } : msg); }
+    }
+    function applyPres(id, m) {
+      const g = gone.get(id); if (g && Date.now() - g < 15000) return;
+      if (typeof m.q === 'number') { const last = lastSeq.get(id) || 0; if (m.q <= last && m.q > last - 100000) return; lastSeq.set(id, m.q); }
+      setPres(id, m.p && typeof m.p === 'object' ? m.p : {});
+    }
+    function killLink(id, failed) {
+      const l = links.get(id); if (!l) return;
+      links.delete(id);
+      try { l.dc && l.dc.close(); } catch (e) { /* ignore */ }
+      try { l.pc.close(); } catch (e) { /* ignore */ }
+      if (failed) noRetry.set(id, Date.now());
+    }
+    function waitIce(pc) {
+      return new Promise(res => {
+        if (pc.iceGatheringState === 'complete') return res();
+        const t = setTimeout(res, 2500);
+        pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+      });
+    }
+    async function makeLink(id, offerSdp) {
+      if (!HAS_RTC || left) return;
+      killLink(id);
+      const pc = new RTCPeerConnection(RTC_CFG), l = { pc, dc: null, ready: false };
+      links.set(id, l);
+      const setup = dc => {
+        l.dc = dc;
+        dc.onopen = () => { l.ready = true; try { dc.send(enc({ id: myId, p: myPres, q: ++seq })); } catch (e) { /* ignore */ } };
+        dc.onclose = () => { if (links.get(id) === l) killLink(id, true); };
+        dc.onmessage = e => { const m = dec(e.data); if (m && m.id === id) applyPres(id, m); };
+      };
+      if (!offerSdp) setup(pc.createDataChannel('g', { ordered: false, maxRetransmits: 0 }));
+      else pc.ondatachannel = e => setup(e.channel);
+      pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState) && links.get(id) === l) killLink(id, true); };
+      setTimeout(() => { if (links.get(id) === l && !l.ready) killLink(id, true); }, 12000);
+      try {
+        if (!offerSdp) {
+          await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc);
+          if (links.get(id) === l) pub('s/' + id, { id: myId, o: pc.localDescription.sdp });
+        } else {
+          await pc.setRemoteDescription({ type: 'offer', sdp: offerSdp });
+          await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc);
+          if (links.get(id) === l) pub('s/' + id, { id: myId, a: pc.localDescription.sdp });
+        }
+      } catch (e) { if (links.get(id) === l) killLink(id, true); }
+    }
+    function maybeLink(id) { // the lower id dials; failed pairs wait 20 s before trying again
+      if (!HAS_RTC || id === myId || links.has(id) || !(myId < id)) return;
+      const f = noRetry.get(id); if (f && Date.now() - f < 20000) return;
+      makeLink(id);
+    }
 
     let rtt = 0;
     function onMessage(topic, payload) {
@@ -1187,9 +1255,14 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (sub.startsWith('q/')) return;
       if (m.id === myId) return;
       if (sub === 'p') {
-        setPres(m.id, m.p && typeof m.p === 'object' ? m.p : {});
-        if (m.h) setTimeout(() => sendPres(false), Math.random() * 300); // greet newcomers
-      } else if (sub === 'bye') drop(m.id);
+        applyPres(m.id, m);
+        if (m.h) { lastMqtt = 0; setTimeout(() => sendPres(false), Math.random() * 300); } // greet newcomers
+        maybeLink(m.id);
+      } else if (sub === 's/' + myId) {
+        if (typeof m.o === 'string') makeLink(m.id, m.o);
+        else if (typeof m.a === 'string') { const l = links.get(m.id); if (l && l.pc.signalingState === 'have-local-offer') l.pc.setRemoteDescription({ type: 'answer', sdp: m.a }).catch(() => killLink(m.id, true)); }
+      } else if (sub.startsWith('s/')) { /* signalling for someone else */ }
+      else if (sub === 'bye') { gone.set(m.id, Date.now()); drop(m.id); }
       else if (sub.startsWith('e/')) { const v = peers.get(m.id); if (v) v.heard = Date.now(); deliver(sub.slice(2), m.d, m.id); }
     }
 
@@ -1233,6 +1306,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (now - lastSent > HB) sendPres(false); // heartbeat
       if (now % 3000 < 1000) pub('q/' + myId, { id: myId, t: now }); // ping: measure round trip through the broker
       for (const [id, v] of peers) if (id !== myId && now - v.heard > STALE) drop(id); // silent = gone
+      for (const id of peers.keys()) maybeLink(id);
     }, 1000);
     window.addEventListener('beforeunload', () => { if (!left) { pub('bye', { id: myId }); left = true; } });
     window.addEventListener('pagehide', () => { pub('bye', { id: myId }); });
@@ -1251,7 +1325,8 @@ if (typeof module !== 'undefined') module.exports = SIM;
       onPeers(h) { peerHandlers.push(h); setTimeout(() => h({ peers: snapshot(), joined: snapshot(), left: [], updated: [] }), 0); return () => { const i = peerHandlers.indexOf(h); if (i >= 0) peerHandlers.splice(i, 1); }; },
       connected: () => ok,
       onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
-      async leave() { if (left) return; pub('bye', { id: myId }); left = true; setOk(false); try { client && client.end(); } catch (e) { /* ignore */ } },
+      async leave() { if (left) return; pub('bye', { id: myId }); left = true; setOk(false); for (const id of [...links.keys()]) killLink(id); try { client && client.end(); } catch (e) { /* ignore */ } },
+      links: () => ({ ready: readyLinks(), total: Math.max(0, peers.size - 1) }),
       count: () => peers.size,
       rtt: () => rtt,
       get broker() { return BROKERS[brokerIdx]; },
@@ -2133,8 +2208,11 @@ function updateHud() {
   else if (S.ph === 'end') { tm.textContent = 'Kết thúc'; tm.className = ''; }
   else { tm.textContent = (S.sd ? '⚠️ ' : '⏱ ') + fmtTime(S.tl); tm.className = S.sd ? 'sd' : ''; }
   if (IS_WEB && app.mode === 'online' && app.nroom?.rtt) {
-    const ms2 = app.nroom.rtt(); const nt = $('netTag');
-    if (ms2) { nt.style.display = ''; nt.textContent = '📶 ' + ms2 + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Độ trễ tới máy chủ phòng'; }
+    const ms2 = app.nroom.rtt(), lk = app.nroom.links ? app.nroom.links() : { ready: 0, total: 0 }, nt = $('netTag');
+    nt.style.display = '';
+    if (lk.total && lk.ready === lk.total) { nt.textContent = '⚡ Trực tiếp'; nt.style.background = '#1f6b3a'; nt.title = 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
+    else if (lk.ready) { nt.textContent = `⚡ ${lk.ready}/${lk.total} trực tiếp`; nt.style.background = '#5a6a1a'; nt.title = 'Một số người đi qua máy chủ trung chuyển'; }
+    else if (ms2) { nt.textContent = '☁️ ' + ms2 + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
   }
   const mi = MAP_INFO[S?.mp]; $('mapTag').textContent = mi ? mi.name + ({ 19: ' · Vừa', 23: ' · Siêu lớn' }[S.W] || '') : '';
   // role

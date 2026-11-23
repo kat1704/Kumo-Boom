@@ -613,8 +613,14 @@ const SIM = (() => {
     const x = +inp.pos.x, y = +inp.pos.y;
     if (!isFinite(x) || !isFinite(y) || x < 0.5 || y < 0.5 || x > W - 1.5 || y > H - 1.5) return false;
     const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~'; };
-    if (Math.hypot(x - p.x, y - p.y) > 1.6) return false; // e.g. we just teleported them: wait for their client to catch up
-    if (blocked(Math.round(x), Math.round(y)) || blocked(Math.round((x + p.x) / 2), Math.round((y + p.y) / 2))) return false;
+    if (p.lockT > 0) return false; // we just moved them (teleport): wait for their client to follow
+    // how far could they have gone since the last report we took? (network hiccups bunch updates up)
+    const speed = BASE_SPEED + MAX_SPEED_LVL * SPEED_STEP;
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d > Math.min(4, 0.8 + speed * (p.sinceAcc || 0) * 1.3)) return false;
+    const n = Math.max(1, Math.ceil(d / 0.25));
+    for (let k = 1; k <= n; k++) { const t = k / n; if (blocked(Math.round(p.x + (x - p.x) * t), Math.round(p.y + (y - p.y) * t))) return false; }
+    p.sinceAcc = 0;
     const moved = Math.abs(x - p.x) + Math.abs(y - p.y);
     p.x = x; p.y = y;
     if (typeof inp.dir === 'number' && inp.dir >= 0 && inp.dir <= 3) p.dir = inp.dir;
@@ -681,6 +687,7 @@ const SIM = (() => {
   }
 
   function teleport(g, p, from) {
+    p.lockT = 0.7;
     const D = dangerMap(g), cand = [], ok = [];
     for (let i = 0; i < W * H; i++) {
       const c = g.map[i]; if (!(c === '.' || c === 'g' || c === '=') || g.bombAt[i] || g.flames[i] > 0) continue;
@@ -856,6 +863,7 @@ const SIM = (() => {
           continue;
         }
       }
+      p.sinceAcc = (p.sinceAcc || 0) + dt; if (p.lockT > 0) p.lockT -= dt;
       if (!(inp.pos && p.st === 0 && acceptPos(g, p, inp))) movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
       if (inp.bomb) placeBomb(g, p, inp.cell);
       for (const id of [...p.ghost]) {
@@ -1825,9 +1833,12 @@ function predictStep(S, dt) {
   SIM.predictMove({ map, bombAt }, P, inp.dx, inp.dy, dt);
   if (performance.now() - (PRED.sentAt || 0) > 33 && Math.abs(P.x - (PRED.sx ?? -9)) + Math.abs(P.y - (PRED.sy ?? -9)) > 0.01) sendInput();
   // reconcile softly with the authoritative position
-  const ex = sx - P.x, ey = sy - P.y, err = Math.hypot(ex, ey);
-  PRED.far = err > 1.4 ? (PRED.far || 0) + dt : 0;
-  if (err > 2.2 || PRED.far > 0.6) { P.x = sx; P.y = sy; PRED.far = 0; } // host disagrees for real (teleport, blocked): follow it
+  // the snapshot shows where we were a little while ago: compare it with our own recent path, not just our current spot
+  const now = performance.now(), H = PRED.hist || (PRED.hist = []);
+  H.push({ t: now, x: P.x, y: P.y }); while (H.length && now - H[0].t > 900) H.shift();
+  let err = Infinity; for (const h of H) err = Math.min(err, Math.hypot(sx - h.x, sy - h.y));
+  PRED.far = err > 0.9 ? (PRED.far || 0) + dt : 0;
+  if (err > 2.5 || PRED.far > 0.5) { P.x = sx; P.y = sy; PRED.far = 0; H.length = 0; } // host really disagrees (teleport, blocked): follow it
 }
 
 // ---------- draw ----------

@@ -1459,6 +1459,13 @@ const SFX = {
 
 // ---------- canvas & projection ----------
 const cv = $('cv'), ctx = cv.getContext('2d');
+(() => {
+  const P = CanvasRenderingContext2D.prototype;
+  if (P.__safeArcs) return; P.__safeArcs = true;
+  const arc = P.arc, ell = P.ellipse;
+  P.arc = function (x, y, r, a0, a1, ccw) { return arc.call(this, x, y, r > 0 ? r : 0.0001, a0, a1, ccw); };
+  P.ellipse = function (x, y, rx, ry, rot, a0, a1, ccw) { return ell.call(this, x, y, rx > 0 ? rx : 0.0001, ry > 0 ? ry : 0.0001, rot, a0, a1, ccw); };
+})();
 let DPR = 1, VW = 0, VH = 0, T = 40, TY = 29, HZ = 25, OX = 0, OY = 0;
 const sprites = {};
 function layout() {
@@ -1482,6 +1489,7 @@ function layout() {
   } else { $('left').style.top = ''; $('banner').style.top = ''; if ($('traitBar')) $('traitBar').style.top = ''; }
   const aw = VW - left - right, ah = VH - top - bottom;
   T = Math.max(14, Math.min(aw / (W + 0.3), ah / (H * 0.72 + 1.3)));
+  if (!isFinite(T)) T = 30;
   TY = T * 0.72; HZ = T * 0.62;
   OX = left + (aw - W * T) / 2 + T / 2;
   OY = top + (ah - H * TY - HZ) / 2 + HZ + TY / 2;
@@ -1786,17 +1794,29 @@ function predictStep(S, dt) {
 
 // ---------- draw ----------
 let lastFrame = performance.now();
+let drawErrShown = 0;
+function showDrawError(e) {
+  const now = Date.now(); if (now - drawErrShown < 10000) return; drawErrShown = now;
+  console.error(e);
+  toast('⚠️ Lỗi vẽ màn hình: ' + (e && e.message || e) + ' (game vẫn chạy tiếp — chụp màn hình gửi Claude nhé)', 6000);
+}
 function frame() {
-  const nowMs = performance.now(), dt = Math.min(0.05, (nowMs - lastFrame) / 1000); lastFrame = nowMs;
+  requestAnimationFrame(frame); // schedule first: one bad frame can never freeze the screen
+  const nowMs = performance.now(), dt = Math.min(0.05, Math.max(0, (nowMs - lastFrame) / 1000)); lastFrame = nowMs;
   const now = nowMs / 1000;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.clearRect(0, 0, VW, VH);
+  if (!visible) return;
   const S = app.S;
-  if (!visible) { requestAnimationFrame(frame); return; }
-  try { if (S && S.m) predictStep(S, dt); } catch (e) { PRED.on = false; }
-  if (S && S.m) drawBoard(S, dt, now);
-  updateCenter(S, now);
-  requestAnimationFrame(frame);
+  try {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, VW, VH);
+    try { if (S && S.m) predictStep(S, dt); } catch (e) { PRED.on = false; }
+    if (S && S.m && isFinite(T) && T > 0) drawBoard(S, dt, now);
+  } catch (e) {
+    showDrawError(e);
+    try { for (let k = 0; k < 20; k++) ctx.restore(); ctx.globalAlpha = 1; } catch (er) { /* ignore */ }
+    if (!isFinite(T) || T <= 0) layout();
+  }
+  try { updateCenter(S, now); } catch (e) { showDrawError(e); }
 }
 
 function drawBoard(S, dt, now) {
@@ -2839,8 +2859,8 @@ $('hpNpc').onchange = () => { host.npc = $('hpNpc').checked; if (host.g.phase ==
 $('hpAutoCm').onchange = () => host.autoCm = $('hpAutoCm').checked;
 $('hpAutoSeat').onchange = () => { host.autoSeat = $('hpAutoSeat').checked; toast(host.autoSeat ? 'Người muốn chơi sẽ tự vào ghế trống' : 'Chỉ host xếp người vào ghế', 2000); };
 $('hpPlay').onchange = () => { host.hostPlays = $('hpPlay').checked; app.role = host.hostPlays ? 'play' : 'watch'; if (app.nroom) app.nroom.presence({ want: app.role }).catch(() => {}); };
-$('hpStart').onclick = () => { ac(); hostSeatMaintenance(); if (!host.g.players.some(Boolean)) return toast('Cần ít nhất 1 ghế có người hoặc bot'); hostNewGame('pick'); };
-$('hpNewMap').onclick = () => { host.seed = (Math.random() * 1e9) | 0; if (host.g.phase === 'lobby') { host.curMap = pickMap(); hostRebuildLobby(); } else hostNewGame('pick'); };
+$('hpStart').onclick = () => { ac(); hostSeatMaintenance(); if (!host.g.players.some(Boolean)) return toast('Cần ít nhất 1 ghế có người hoặc bot'); hostNewGame('pick'); $('hostPanel').style.display = 'none'; };
+$('hpNewMap').onclick = () => { host.seed = (Math.random() * 1e9) | 0; if (host.g.phase === 'lobby') { host.curMap = pickMap(); hostRebuildLobby(); } else { hostNewGame('pick'); $('hostPanel').style.display = 'none'; } };
 $('hpSize').onchange = () => {
   host.size = $('hpSize').value;
   if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby();

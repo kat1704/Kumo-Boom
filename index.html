@@ -1128,7 +1128,7 @@ const SIM = (() => {
   // client-side prediction: move a lightweight copy of the player against a map snapshot
   function predictMove(world, p, dx, dy, dt) { movePlayer(world, p, dx, dy, dt); }
   function useDims(w, h) { if (w && h && (w !== W || h !== H)) { W = w; H = h; } }
-  return { predictMove, useDims, get W() { return W; }, get H() { return H; }, SIZES, MAPS, COUNT_TIME, KILL_PTS, WIN_PTS, BOMB_TIME, TRAP_TIME, get ROUND_TIME() { return ROUND_TIME; }, createGame, step, botThink, encode, preview, blastCells };
+  return { setDims, predictMove, useDims, get W() { return W; }, get H() { return H; }, SIZES, MAPS, COUNT_TIME, KILL_PTS, WIN_PTS, BOMB_TIME, TRAP_TIME, get ROUND_TIME() { return ROUND_TIME; }, createGame, step, botThink, encode, preview, blastCells };
 })();
 if (typeof module !== 'undefined') module.exports = SIM;
 
@@ -1429,6 +1429,137 @@ if (typeof module !== 'undefined') module.exports = SIM;
     },
   };
   window.claude = { use: async n => (n === 'room' ? room : null), __web: true };
+})();
+
+// ===== Dedicated room server (Cloudflare Durable Object): everyone plays on the same server =====
+// Same room API as mqttroom.js; falls back to it when the server can't be reached.
+(() => {
+  if (!window.claude || !window.claude.__web) return;
+  const SERVERS = window.__BOOM_SRV || ['wss://boom-server.trunganh1704.workers.dev/ws/'];
+  const fallback = window.claude.use;
+  const OPEN_TIMEOUT = 4000;
+
+  function makeRoom(name) {
+    let ws = null, myId = null, ok = false, left = false, rtt = 0, url = '', retry = 0;
+    const peers = new Map(); // id -> { p, at }
+    const peerHandlers = [], connHandlers = [], topics = {};
+    let myPres = {};
+    let lastMap = null;
+    const snapshot = () => [...peers.entries()].map(([id, v]) => Object.freeze({ peer: id, by: null, isMe: id === myId, sameTab: id === myId, kind: 'viewer', guest: false, presence: v.p, updatedAt: v.at }));
+    function fire(joined, left_, updated) {
+      const ps = snapshot(), by = new Map(ps.map(p => [p.peer, p]));
+      const ch = { peers: ps, joined: joined.map(i => by.get(i)).filter(Boolean), left: left_, updated: updated.map(i => by.get(i)).filter(Boolean) };
+      for (const h of peerHandlers) { try { h(ch); } catch (e) { console.error(e); } }
+    }
+    function setOk(v) { if (ok === v) return; ok = v; for (const h of connHandlers) { try { h(v); } catch (e) { /* ignore */ } } }
+    function setPeer(id, p) {
+      const had = peers.has(id); peers.set(id, { p: Object.freeze({ ...p }), at: Date.now() });
+      fire(had ? [] : [id], [], had ? [id] : []);
+    }
+    function onMsg(ev) {
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (!m) return;
+      if (m.t === 's') {
+        const d = m.d; if (!d || typeof d !== 'object') return;
+        if (typeof d.m === 'string') lastMap = { m: d.m, rk: d.rk, W: d.W, H: d.H };
+        else if (lastMap && lastMap.rk === d.rk && lastMap.W === d.W && lastMap.H === d.H) d.m = lastMap.m;
+        else return;
+        const s = peers.get('srv'); if (!s) return;
+        peers.set('srv', { p: Object.freeze({ ...s.p, st: d }), at: Date.now() });
+        fire([], [], ['srv']);
+      } else if (m.t === 'p' && typeof m.id === 'string') {
+        if (m.id === myId) return;
+        const keep = m.id === 'srv' ? peers.get('srv')?.p?.st : undefined;
+        setPeer(m.id, keep ? { ...m.p, st: keep } : m.p || {});
+      } else if (m.t === 'bye') {
+        const v = peers.get(m.id); if (!v) return; peers.delete(m.id);
+        fire([], [Object.freeze({ peer: m.id, isMe: false, sameTab: false, kind: 'viewer', presence: v.p })], []);
+      } else if (m.t === 'e') {
+        for (const h of topics[m.k] || []) { try { h({ peer: m.id, data: m.d, sameTab: false }); } catch (e) { console.error(e); } }
+      } else if (m.t === 'pong') { const v = Date.now() - m.c; rtt = rtt ? Math.round(rtt * 0.6 + v * 0.4) : v; }
+    }
+    function connect(u) {
+      return new Promise((res, rej) => {
+        let done = false; const s = new WebSocket(u);
+        const to = setTimeout(() => { if (!done) { done = true; try { s.close(); } catch (e) { /* ignore */ } rej(new Error('timeout')); } }, OPEN_TIMEOUT);
+        s.onmessage = ev => {
+          if (!done) {
+            let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+            if (m.t !== 'hi') return;
+            done = true; clearTimeout(to);
+            ws = s; myId = m.id;
+            const fresh = new Map(); for (const [id, p] of m.peers || []) fresh.set(id, { p: Object.freeze({ ...p }), at: Date.now() });
+            const old = new Set(peers.keys()); peers.clear(); for (const [k, v] of fresh) peers.set(k, v);
+            peers.set(myId, { p: Object.freeze({ ...myPres }), at: Date.now() });
+            s.onmessage = onMsg;
+            if (Object.keys(myPres).length) s.send(JSON.stringify({ t: 'p', p: myPres }));
+            setOk(true);
+            fire([...peers.keys()].filter(k => !old.has(k)), [], [...peers.keys()].filter(k => old.has(k)));
+            res();
+          }
+        };
+        s.onerror = () => { if (!done) { done = true; clearTimeout(to); rej(new Error('error')); } };
+        s.onclose = () => {
+          if (!done) { done = true; clearTimeout(to); rej(new Error('closed')); return; }
+          if (ws !== s) return;
+          setOk(false); ws = null;
+          if (!left) setTimeout(reconnect, Math.min(4000, 500 * ++retry)); // came back as a new id
+        };
+      });
+    }
+    async function reconnect() { if (left || ws) return; try { await connect(url); retry = 0; } catch (e) { if (!left) setTimeout(reconnect, 2000); } }
+    setInterval(() => { if (ws && ok) { try { ws.send(JSON.stringify({ t: 'ping', c: Date.now() })); } catch (e) { /* ignore */ } } }, 2000);
+    const api = {
+      name, server: true,
+      async presence(patch) {
+        const n = { ...myPres }; for (const k in patch) { if (patch[k] === null) delete n[k]; else n[k] = patch[k]; }
+        myPres = n;
+        if (myId) { peers.set(myId, { p: Object.freeze({ ...n }), at: Date.now() }); if (!('inp' in patch && Object.keys(patch).length === 1)) fire([], [], [myId]); }
+        if (ws && ok) ws.send(JSON.stringify({ t: 'p', p: patch }));
+      },
+      async emit(topic, data) {
+        if (!ws || !ok) return;
+        ws.send(JSON.stringify({ t: 'e', k: topic, d: data }));
+        if (topic !== 'adm') for (const h of topics[topic] || []) { try { h({ peer: myId, data, sameTab: true }); } catch (e) { /* ignore */ } }
+      },
+      on(topic, h) { (topics[topic] = topics[topic] || []).push(h); return () => { topics[topic] = (topics[topic] || []).filter(x => x !== h); }; },
+      peers: snapshot,
+      onPeers(h) { peerHandlers.push(h); setTimeout(() => h({ peers: snapshot(), joined: snapshot(), left: [], updated: [] }), 0); return () => { const i = peerHandlers.indexOf(h); if (i >= 0) peerHandlers.splice(i, 1); }; },
+      connected: () => ok,
+      onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
+      async leave() { left = true; setOk(false); try { ws && ws.close(); } catch (e) { /* ignore */ } },
+      links: () => ({ ready: 1, total: 1, relay: 0, turn: true }),
+      linkMs: () => rtt, rtt: () => rtt, count: () => peers.size - 1,
+      get myId() { return myId; },
+      diag: () => ({ rtc: true, turn: 'không cần (đang dùng máy chủ riêng)', broker: 'Máy chủ riêng boom-server', rtt, peers: [] }),
+      async _start() {
+        let err = null;
+        for (const s of SERVERS) { url = s + encodeURIComponent(name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 40)); try { await connect(url); return; } catch (e) { err = e; } }
+        throw err || new Error('no server');
+      },
+    };
+    return api;
+  }
+
+  const rooms = {};
+  const room = {
+    join(name) {
+      if (rooms[name]) return rooms[name];
+      rooms[name] = (async () => {
+        const r = makeRoom(name);
+        try { await r._start(); return r; }
+        catch (e) {
+          console.warn('room server unreachable, using MQTT/P2P', e);
+          await r.leave();
+          const fb = await fallback('room');
+          return fb.join(name);
+        }
+      })();
+      rooms[name].catch(() => delete rooms[name]);
+      return rooms[name];
+    },
+  };
+  window.claude = { use: async n => (n === 'room' ? room : fallback(n)), __web: true };
 })();
 
 // ===== BOOM APP: render + UI + network =====
@@ -1814,7 +1945,25 @@ function handleEvent(e, S) {
 const PRED = { on: false, p: null, seat: -1, ghost: new Set(), bombsKey: '' };
 // sync mode: everyone is on a fast direct link, so nobody predicts. Every player sees exactly what the host
 // simulates (no rollback), and the host's own input is held back by the same round trip so it is fair.
+// dedicated room server: the match runs on Cloudflare, every browser is just a screen + controller
+const SRVM = () => !!(app.nroom && app.nroom.server);
+const srvPres = () => app.peers.find(p => p.peer === 'srv')?.presence || {};
+const isAdm = () => SRVM() && !!app.myPeer && srvPres().ad === app.myPeer;
+const amHost = () => app.isHost || isAdm();
+function A(k, v) {
+  if (!SRVM()) return false;
+  if (!isAdm()) { toast('Chỉ host của phòng mới chỉnh được', 1800); return true; }
+  app.nroom.emit('adm', { k, v }).catch(() => {});
+  return true;
+}
+function mirrorServerHost() { // fill the host panel's state from what the server reports
+  const S = app.S; if (!S) return;
+  host.seats = [0, 1, 2, 3].map(i => { const s = S.s?.[i]; return !s ? { type: 'empty', peer: null, name: '' } : s[0] === 1 ? { type: 'bot', peer: null, name: s[1] } : { type: 'human', peer: s[2], name: s[1] }; });
+  const c = S.cfg || {};
+  Object.assign(host, { mode: c.mode || 'ffa', mapSel: c.map || 'random', size: c.size || 'normal', npc: !!c.npc, auto: !!c.auto, autoCm: !!c.autoCm, autoSeat: !!c.autoSeat, hostPlays: app.role === 'play' });
+}
 function syncMode() {
+  if (SRVM()) return true;
   if (!IS_WEB || app.mode !== 'online' || !app.nroom || !app.nroom.links) return false;
   const lk = app.nroom.links(); return lk.total > 0 && lk.ready === lk.total && (app.nroom.linkMs() || 0) < 220;
 }
@@ -2324,7 +2473,8 @@ function updateHud() {
     const ms2 = app.nroom.rtt(), lk = app.nroom.links ? app.nroom.links() : { ready: 0, total: 0 }, nt = $('netTag');
     nt.style.display = '';
     const lms = app.nroom.linkMs ? app.nroom.linkMs() : 0;
-    if (!lk.total) { nt.textContent = '👤 Chỉ có mình bạn'; nt.style.background = '#3a4660'; nt.title = 'Chưa có ai khác trong phòng'; }
+    if (SRVM()) { nt.textContent = '🖥️ Máy chủ ' + (ms2 || '…') + 'ms'; nt.style.background = ms2 < 120 ? '#1f6b3a' : ms2 < 250 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Mọi người cùng chơi trên một máy chủ riêng'; }
+    else if (!lk.total) { nt.textContent = '👤 Chỉ có mình bạn'; nt.style.background = '#3a4660'; nt.title = 'Chưa có ai khác trong phòng'; }
     else if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : '') + (syncMode() ? ' · ⚖️' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
     else if (lk.ready) { nt.textContent = `⚡ ${lk.ready}/${lk.total} trực tiếp`; nt.style.background = '#5a6a1a'; nt.title = 'Một số người đi qua máy chủ trung chuyển'; }
     else if (ms2 || 1) { nt.textContent = '☁️ ' + (ms2 || '…') + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
@@ -2332,12 +2482,12 @@ function updateHud() {
   const mi = MAP_INFO[S?.mp]; $('mapTag').textContent = mi ? mi.name + ({ 19: ' · Vừa', 23: ' · Siêu lớn' }[S.W] || '') : '';
   // role
   const ms = mySeat(S);
-  $('roleBadge').textContent = (app.isHost ? '🎙️ Host · ' : '') + (ms >= 0 ? 'Đang chơi ghế ' + (ms + 1) : app.role === 'play' ? 'Chờ vào ghế…' : 'Người xem');
+  $('roleBadge').textContent = (amHost() ? '🎙️ Host · ' : '') + (ms >= 0 ? 'Đang chơi ghế ' + (ms + 1) : app.role === 'play' ? 'Chờ vào ghế…' : 'Người xem');
   $('bPlay').className = app.role === 'play' ? 'on' : '';
   $('bWatch').className = app.role === 'watch' && !app.isHost ? 'on' : '';
-  $('bHost').className = app.isHost ? 'on' : '';
+  $('bHost').className = amHost() ? 'on' : '';
   $('bHost').textContent = app.isHost ? '🎙️ Thôi host' : '🎙️ Host';
-  $('bPanel').style.display = app.isHost ? '' : 'none';
+  $('bPanel').style.display = amHost() ? '' : 'none';
   // touch controls only while we actually control a character in a running round
   const playingNow = ms >= 0 && S && (S.ph === 'play' || S.ph === 'count') && !S.pz;
   $('touch').classList.toggle('idle', !playingNow);
@@ -2368,13 +2518,14 @@ function updateHud() {
   const specs = [];
   if (app.mode === 'online') {
     for (const pe of app.peers) {
+      if (pe.peer === 'srv') continue;
       const pr = pe.presence || {};
       const seated = S?.s?.some(st => st && st[2] === pe.peer);
-      if (!seated) specs.push((pe.peer === app.hostPeer ? '🎙️ ' : pr.want === 'play' ? '⏳ ' : '👀 ') + (clean(pr.n, 16) || 'Ai đó') + (pe.sameTab ? ' (bạn)' : ''));
+      if (!seated) specs.push((pe.peer === app.hostPeer || (SRVM() && srvPres().ad === pe.peer) ? '🎙️ ' : pr.want === 'play' ? '⏳ ' : '👀 ') + (clean(pr.n, 16) || 'Ai đó') + (pe.sameTab ? ' (bạn)' : ''));
     }
   }
   const specHtml = specs.length ? specs.map(esc).join('<br>') : '—';
-  if (IS_WEB && app.mode === 'online') { const n = app.peers.length; const rc = $('roomCount'); const txt = `Phòng "${app.code}" đang có ${n} người${n <= 1 ? ' — chỉ có mình bạn, gửi link mời cho bạn bè nhé!' : ''}`; if (rc.textContent !== txt) rc.textContent = txt; }
+  if (IS_WEB && app.mode === 'online') { const n = app.peers.filter(p => p.peer !== 'srv').length; const rc = $('roomCount'); const txt = `Phòng "${app.code}" đang có ${n} người${n <= 1 ? ' — chỉ có mình bạn, gửi link mời cho bạn bè nhé!' : ''}`; if (rc.textContent !== txt) rc.textContent = txt; }
   const tbl = statsTable(S, false), big = $('statsBox').style.display === 'block' ? statsTable(S, true) : '';
   const key = html + specHtml + tbl + big;
   if (key !== lastHud) { lastHud = key; $('seats').innerHTML = html; $('specs').innerHTML = specHtml; $('stats').innerHTML = tbl; if (big) $('statsBody').innerHTML = big; }
@@ -2588,6 +2739,7 @@ if ($('netTag')) { $('netTag').style.cursor = 'pointer'; $('netTag').addEventLis
 
 // ---------- pause ----------
 function togglePause() {
+  if (SRVM()) { A('pause'); return; }
   if (!app.isHost) { toast('Chỉ host mới tạm dừng được trận', 1800); return; }
   host.paused = !host.paused;
   if (host.paused) { dirStack.length = 0; applyDir(); }
@@ -2769,6 +2921,7 @@ function applySeatToGame(i) {
 }
 // host drags / taps a person into a seat
 function hostAssign(peer, k) {
+  if (SRVM()) { A('assign', { peer, k }); return; }
   if (!app.isHost || k < 0 || k > 3) return;
   const from = host.seats.findIndex(s => s.type === 'human' && s.peer === peer);
   if (from === k) return;
@@ -2790,6 +2943,7 @@ function hostAssign(peer, k) {
   renderHostPanel(true);
 }
 function hostUnseat(k) {
+  if (SRVM()) { A('unseat', k); return; }
   const s = host.seats[k]; if (s.type !== 'human') return;
   if (s.peer === app.myPeer) { host.hostPlays = false; app.role = 'watch'; } else { host.kicked.add(s.peer); host.forced.delete(s.peer); }
   host.seats[k] = { type: 'bot', peer: null, name: BOT_NAMES[k] };
@@ -2886,6 +3040,7 @@ function pumpComments() {
   hostComment(host.cmQueue.shift());
 }
 function hostComment(text) {
+  if (SRVM()) { A('cm', text); return; }
   text = clean(text, 200); if (!text) return;
   host.cmLast = performance.now();
   host.cmId++;
@@ -2899,11 +3054,13 @@ function roomPeople() {
   const list = [];
   const me = { id: app.myPeer, name: (app.name || 'Host') + ' (bạn)', want: host.hostPlays ? 'play' : 'watch' };
   list.push(me);
-  if (app.mode === 'online') for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer') list.push({ id: p.peer, name: clean(p.presence?.n, 16) || 'Ai đó', want: p.presence?.want });
+  if (SRVM()) me.want = app.role;
+  if (app.mode === 'online') for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer' && p.peer !== 'srv') list.push({ id: p.peer, name: clean(p.presence?.n, 16) || 'Ai đó', want: p.presence?.want });
   return list;
 }
 function renderHostPanel(force) {
-  if (!app.isHost) return;
+  if (!amHost()) return;
+  if (SRVM()) mirrorServerHost();
   $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; $('hpNpc').checked = host.npc; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
   const people = roomPeople();
   const key = JSON.stringify([host.seats, people, host.pick]);
@@ -2945,6 +3102,7 @@ function renderHostPanel(force) {
       sel.addEventListener('pointerdown', takePick); sel.addEventListener('mousedown', ev => { if (host.pick) ev.preventDefault(); });
       sel.onclick = ev => ev.stopPropagation();
       sel.onchange = () => {
+        if (A('seat', { i, type: sel.value })) return;
         host.seats[i] = sel.value === 'bot' ? { type: 'bot', peer: null, name: BOT_NAMES[i] } : { type: 'empty', peer: null, name: '' };
         if (host.g.phase === 'lobby') hostRebuildLobby(); else if (host.g.phase === 'pick') hostRebuildPick(host.g.t, 'pick');
         renderHostPanel(true);
@@ -2959,27 +3117,29 @@ function renderHostPanel(force) {
     box.appendChild(d);
   });
 }
-setInterval(() => { if (app.isHost && $('hostPanel').style.display === 'block') renderHostPanel(); }, 400);
-$('hpMode').onchange = () => { host.mode = $('hpMode').value; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Chế độ mới áp dụng từ ván sau'); };
-$('hpAuto').onchange = () => host.auto = $('hpAuto').checked;
-$('hpNpc').onchange = () => { host.npc = $('hpNpc').checked; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Áp dụng từ ván sau'); };
-$('hpAutoCm').onchange = () => host.autoCm = $('hpAutoCm').checked;
-$('hpAutoSeat').onchange = () => { host.autoSeat = $('hpAutoSeat').checked; toast(host.autoSeat ? 'Người muốn chơi sẽ tự vào ghế trống' : 'Chỉ host xếp người vào ghế', 2000); };
-$('hpPlay').onchange = () => { host.hostPlays = $('hpPlay').checked; app.role = host.hostPlays ? 'play' : 'watch'; if (app.nroom) app.nroom.presence({ want: app.role }).catch(() => {}); };
-$('hpStart').onclick = () => { ac(); hostSeatMaintenance(); if (!host.g.players.some(Boolean)) return toast('Cần ít nhất 1 ghế có người hoặc bot'); hostNewGame('pick'); $('hostPanel').style.display = 'none'; };
-$('hpNewMap').onclick = () => { host.seed = (Math.random() * 1e9) | 0; if (host.g.phase === 'lobby') { host.curMap = pickMap(); hostRebuildLobby(); } else { hostNewGame('pick'); $('hostPanel').style.display = 'none'; } };
+setInterval(() => { if (amHost() && $('hostPanel').style.display === 'block') renderHostPanel(); }, 400);
+$('hpMode').onchange = () => { if (A('mode', $('hpMode').value)) return; host.mode = $('hpMode').value; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Chế độ mới áp dụng từ ván sau'); };
+$('hpAuto').onchange = () => { if (A('auto', $('hpAuto').checked)) return; host.auto = $('hpAuto').checked; };
+$('hpNpc').onchange = () => { if (A('npc', $('hpNpc').checked)) return; host.npc = $('hpNpc').checked; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Áp dụng từ ván sau'); };
+$('hpAutoCm').onchange = () => { if (A('autoCm', $('hpAutoCm').checked)) return; host.autoCm = $('hpAutoCm').checked; };
+$('hpAutoSeat').onchange = () => { if (A('autoSeat', $('hpAutoSeat').checked)) return; host.autoSeat = $('hpAutoSeat').checked; toast(host.autoSeat ? 'Người muốn chơi sẽ tự vào ghế trống' : 'Chỉ host xếp người vào ghế', 2000); };
+$('hpPlay').onchange = () => { if (SRVM()) return setRole($('hpPlay').checked ? 'play' : 'watch'); host.hostPlays = $('hpPlay').checked; app.role = host.hostPlays ? 'play' : 'watch'; if (app.nroom) app.nroom.presence({ want: app.role }).catch(() => {}); };
+$('hpStart').onclick = () => { ac(); if (A('start')) { $('hostPanel').style.display = 'none'; return; } hostSeatMaintenance(); if (!host.g.players.some(Boolean)) return toast('Cần ít nhất 1 ghế có người hoặc bot'); hostNewGame('pick'); $('hostPanel').style.display = 'none'; };
+$('hpNewMap').onclick = () => { if (A('newmap')) { $('hostPanel').style.display = 'none'; return; } host.seed = (Math.random() * 1e9) | 0; if (host.g.phase === 'lobby') { host.curMap = pickMap(); hostRebuildLobby(); } else { hostNewGame('pick'); $('hostPanel').style.display = 'none'; } };
 $('hpSize').onchange = () => {
+  if (A('size', $('hpSize').value)) return;
   host.size = $('hpSize').value;
   if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby();
   else toast('Kích thước mới áp dụng từ ván sau');
 };
 $('hpMap').onchange = () => {
+  if (A('map', $('hpMap').value)) return;
   host.mapSel = $('hpMap').value;
   if (host.g.phase === 'lobby' || host.g.phase === 'end') { host.curMap = pickMap(); hostRebuildLobby(); }
   else toast('Bản đồ mới áp dụng từ ván sau');
 };
-$('hpStop').onclick = () => { host.seed = (Math.random() * 1e9) | 0; host.rk++; hostRebuildLobby(); };
-$('hpReset').onclick = () => { host.wins = [0, 0, 0, 0]; host.g.wins = [0, 0, 0, 0]; host.score = [0, 0, 0, 0]; host.g.score = [0, 0, 0, 0]; toast('Đã xoá bảng điểm'); };
+$('hpStop').onclick = () => { if (A('stop')) return; host.seed = (Math.random() * 1e9) | 0; host.rk++; hostRebuildLobby(); };
+$('hpReset').onclick = () => { if (A('reset')) return toast('Đã xoá bảng điểm'); host.wins = [0, 0, 0, 0]; host.g.wins = [0, 0, 0, 0]; host.score = [0, 0, 0, 0]; host.g.score = [0, 0, 0, 0]; toast('Đã xoá bảng điểm'); };
 $('hpClose').onclick = () => $('hostPanel').style.display = 'none';
 $('bPanel').onclick = () => { const hp = $('hostPanel'); hp.style.display = hp.style.display === 'block' ? 'none' : 'block'; renderHostPanel(); };
 const sendCm = () => { const v = $('hpCm').value; $('hpCm').value = ''; hostComment(v); };
@@ -3088,7 +3248,11 @@ async function enterRoom(role, wantHost, embedRoomName) {
   $('roomTag').textContent = EMBED ? 'Kumo Boardgame' : 'Phòng: ' + app.code;
   if (IS_WEB) { try { history.replaceState(null, '', '#' + app.code); } catch (e) { /* ignore */ } $('bInvite').style.display = ''; showInvite(); addFeed('🔗 Link mời: ' + inviteLink() + ' — bạn bè mở link này là vào đúng phòng.', 'sys'); }
   addFeed(EMBED ? 'Bạn đã vào sân Boom của hội trường.' : 'Bạn đã vào phòng "' + app.code + '". Gửi link trang này cho bạn bè và nhập cùng mã phòng.', 'sys');
-  if (wantHost) setTimeout(() => { if (!app.hostPeer) { startHosting(); $('hostPanel').style.display = 'block'; } else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
+  app.nroom.on('feed', msg => { if (typeof msg.data === 'string') addFeed(clean(msg.data, 140), 'sys'); });
+  if (SRVM()) {
+    if (wantHost) { await app.nroom.presence({ adm: Date.now() }).catch(() => {}); setTimeout(() => { if (isAdm()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); } }, 800); }
+    addFeed('🖥️ Đang chơi trên máy chủ riêng: mọi người cùng độ trễ, host tắt máy phòng vẫn chạy.', 'sys');
+  } else if (wantHost) setTimeout(() => { if (!app.hostPeer) { startHosting(); $('hostPanel').style.display = 'block'; } else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
 }
 function setRole(role) {
   app.role = role; app.wv = Date.now();
@@ -3098,6 +3262,13 @@ function setRole(role) {
 $('bPlay').onclick = () => { ac(); setRole('play'); toast(app.S && app.S.ph === 'play' ? 'Bạn sẽ vào ghế ở ván sau' : 'Đang xin vào ghế…'); };
 $('bWatch').onclick = () => setRole('watch');
 $('bHost').onclick = () => {
+  if (SRVM()) {
+    if (isAdm()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); return; }
+    if (srvPres().ad && app.peers.some(p => p.peer === srvPres().ad && !p.sameTab && typeof p.presence?.adm === 'number')) return toast('Phòng đã có host.');
+    app.nroom.presence({ adm: Date.now() }).catch(() => {});
+    setTimeout(() => { if (isAdm()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); toast('Bạn đang làm host'); } }, 600);
+    return;
+  }
   if (app.isHost) { stopHosting(); return; }
   if (app.hostPeer && performance.now() - app.lastStateAt < 4000) return toast('Phòng đã có host đang chạy.');
   startHosting(); $('hostPanel').style.display = 'block';

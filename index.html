@@ -287,6 +287,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   <div id="roomTag"></div>
   <button id="bInvite" style="display:none" title="Copy link mời bạn bè">🔗 Mời</button>
   <span class="badge" id="mapTag"></span>
+  <span class="badge" id="netTag" style="display:none"></span>
   <div id="timer">--:--</div>
   <div id="roleBtns">
     <span class="badge" id="roleBadge">Người xem</span>
@@ -772,9 +773,15 @@ const SIM = (() => {
     }
   }
 
-  function placeBomb(g, p) {
+  function placeBomb(g, p, want) {
     if (p.st !== 0) return;
-    const cx = Math.round(p.x), cy = Math.round(p.y), i = idx(cx, cy);
+    let cx = Math.round(p.x), cy = Math.round(p.y);
+    // remote players send the cell they saw themselves on (their screen is ahead of ours): trust it if adjacent
+    if (typeof want === 'number' && want >= 0 && want < W * H) {
+      const wx = want % W, wy = (want / W) | 0;
+      if (Math.abs(wx - cx) + Math.abs(wy - cy) <= 1 && Math.abs(wx - p.x) < 1.6 && Math.abs(wy - p.y) < 1.6 && isFloor(g.map[want])) { cx = wx; cy = wy; }
+    }
+    const i = idx(cx, cy);
     if (g.bombAt[i] && p.thr && !g.bombAt[i].vx && !g.bombAt[i].vy) { throwBomb(g, p, g.bombAt[i]); return; }
     if (g.bombAt[i] || !isFloor(g.map[i])) return;
     const out = g.bombs.filter(b => b.o === p.seat).length;
@@ -835,7 +842,7 @@ const SIM = (() => {
         }
       }
       movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
-      if (inp.bomb) placeBomb(g, p);
+      if (inp.bomb) placeBomb(g, p, inp.cell);
       for (const id of [...p.ghost]) {
         const b = g.bombs.find(bb => bb.id === id);
         if (!b || Math.abs(p.x - b.x) >= 0.95 || Math.abs(p.y - b.y) >= 0.95) p.ghost.delete(id);
@@ -1095,7 +1102,10 @@ const SIM = (() => {
   function preview(seed, mode) { const g = createGame({ seed, mode, players: [null, null, null, null] }); g.phase = 'lobby'; return g; }
 
   setDims('normal');
-  return { get W() { return W; }, get H() { return H; }, SIZES, MAPS, COUNT_TIME, KILL_PTS, WIN_PTS, BOMB_TIME, TRAP_TIME, get ROUND_TIME() { return ROUND_TIME; }, createGame, step, botThink, encode, preview, blastCells };
+  // client-side prediction: move a lightweight copy of the player against a map snapshot
+  function predictMove(world, p, dx, dy, dt) { movePlayer(world, p, dx, dy, dt); }
+  function useDims(w, h) { if (w && h && (w !== W || h !== H)) { W = w; H = h; } }
+  return { predictMove, useDims, get W() { return W; }, get H() { return H; }, SIZES, MAPS, COUNT_TIME, KILL_PTS, WIN_PTS, BOMB_TIME, TRAP_TIME, get ROUND_TIME() { return ROUND_TIME; }, createGame, step, botThink, encode, preview, blastCells };
 })();
 if (typeof module !== 'undefined') module.exports = SIM;
 
@@ -1169,10 +1179,13 @@ if (typeof module !== 'undefined') module.exports = SIM;
     function pub(sub, obj) { if (client && ok) { try { client.publish(base + sub, enc(obj), { qos: 0, retain: false }); } catch (e) { /* ignore */ } } }
     function sendPres(hello) { lastSent = Date.now(); pub('p', { id: myId, p: myPres, h: hello ? 1 : 0 }); }
 
+    let rtt = 0;
     function onMessage(topic, payload) {
       const m = dec(payload); if (!m || typeof m !== 'object' || typeof m.id !== 'string') return;
-      if (m.id === myId) return;
       const sub = topic.slice(base.length);
+      if (sub === 'q/' + myId) { if (m.id === myId && typeof m.t === 'number') { const v = Date.now() - m.t; rtt = rtt ? Math.round(rtt * 0.6 + v * 0.4) : v; } return; }
+      if (sub.startsWith('q/')) return;
+      if (m.id === myId) return;
       if (sub === 'p') {
         setPres(m.id, m.p && typeof m.p === 'object' ? m.p : {});
         if (m.h) setTimeout(() => sendPres(false), Math.random() * 300); // greet newcomers
@@ -1218,6 +1231,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       if (left || !ok) return;
       const now = Date.now();
       if (now - lastSent > HB) sendPres(false); // heartbeat
+      if (now % 3000 < 1000) pub('q/' + myId, { id: myId, t: now }); // ping: measure round trip through the broker
       for (const [id, v] of peers) if (id !== myId && now - v.heard > STALE) drop(id); // silent = gone
     }, 1000);
     window.addEventListener('beforeunload', () => { if (!left) { pub('bye', { id: myId }); left = true; } });
@@ -1239,6 +1253,7 @@ if (typeof module !== 'undefined') module.exports = SIM;
       onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
       async leave() { if (left) return; pub('bye', { id: myId }); left = true; setOk(false); try { client && client.end(); } catch (e) { /* ignore */ } },
       count: () => peers.size,
+      rtt: () => rtt,
       get broker() { return BROKERS[brokerIdx]; },
       _start: start,
       get _dbg() { return { myId, ok, broker: BROKERS[brokerIdx], peers: [...peers.keys()] }; },
@@ -1628,6 +1643,34 @@ function handleEvent(e, S) {
   if (tx) addFeed(tx.t, tx.sys ? 'sys' : '');
 }
 
+// ---------- client-side prediction (remote players only) ----------
+const PRED = { on: false, p: null, seat: -1, ghost: new Set(), bombsKey: '' };
+function predictStep(S, dt) {
+  const ms = mySeat(S);
+  PRED.on = app.mode === 'online' && !app.isHost && ms >= 0 && !!S && S.ph === 'play' && !S.pz;
+  if (!PRED.on) { PRED.p = null; PRED.seat = -1; return; }
+  const sp = S.p[ms]; if (!sp) { PRED.on = false; return; }
+  const sx = sp[0] / 100, sy = sp[1] / 100;
+  if (!PRED.p || PRED.seat !== ms || sp[2] !== 0) { PRED.p = { x: sx, y: sy, dir: sp[3], st: 0, spd: sp[6], pw: 0, kick: 0, ghost: new Set(), moving: 0 }; PRED.seat = ms; if (sp[2] !== 0) return; }
+  const P = PRED.p; P.spd = sp[6];
+  SIM.useDims(W, H);
+  // world built from the latest snapshot
+  const map = new Array(W * H), bombAt = new Array(W * H).fill(null);
+  for (let i = 0; i < W * H; i++) { const c = S.m[i]; map[i] = c === '*' ? '.' : c; }
+  for (const b of S.b || []) { if (b[5] >= 0) continue; const i = Math.round(b[1] / 100) * W + Math.round(b[0] / 100); bombAt[i] = { id: i }; }
+  if (R.pendingBomb && performance.now() - R.pendingBomb.t < 1500 && !bombAt[R.pendingBomb.cell]) bombAt[R.pendingBomb.cell] = { id: R.pendingBomb.cell };
+  // ghost: bombs we are standing on stay walkable until we step off
+  for (const id of [...P.ghost]) if (!bombAt[id] || Math.abs(P.x - id % W) >= 0.95 || Math.abs(P.y - ((id / W) | 0)) >= 0.95) P.ghost.delete(id);
+  for (let i = 0; i < W * H; i++) if (bombAt[i] && !P.ghost.has(i) && Math.abs(P.x - i % W) < 0.95 && Math.abs(P.y - ((i / W) | 0)) < 0.95 && !PRED.known?.has(i)) P.ghost.add(i);
+  PRED.known = new Set(bombAt.map((b, i) => b ? i : -1).filter(i => i >= 0));
+  SIM.predictMove({ map, bombAt }, P, inp.dx, inp.dy, dt);
+  // reconcile softly with the authoritative position
+  const ex = sx - P.x, ey = sy - P.y, err = Math.hypot(ex, ey);
+  if (err > 2.2) { P.x = sx; P.y = sy; }
+  else if (!inp.dx && !inp.dy) { const k = Math.min(1, dt * 5); P.x += ex * k; P.y += ey * k; }
+  else if (err > 1.2) { const k = Math.min(1, dt * 1.5); P.x += ex * k; P.y += ey * k; }
+}
+
 // ---------- draw ----------
 let lastFrame = performance.now();
 function frame() {
@@ -1637,6 +1680,7 @@ function frame() {
   ctx.clearRect(0, 0, VW, VH);
   const S = app.S;
   if (!visible) { requestAnimationFrame(frame); return; }
+  try { if (S && S.m) predictStep(S, dt); } catch (e) { PRED.on = false; }
   if (S && S.m) drawBoard(S, dt, now);
   updateCenter(S, now);
   requestAnimationFrame(frame);
@@ -1668,6 +1712,11 @@ function drawBoard(S, dt, now) {
     const p = P[s]; if (!p) { R.disp[s] = null; continue; }
     const tx = p[0] / 100, ty = p[1] / 100;
     let d = R.disp[s];
+    if (PRED.on && PRED.p && s === PRED.seat) { // our own character: drawn where we predict it is (no input lag)
+      if (!d) d = R.disp[s] = { x: PRED.p.x, y: PRED.p.y, walk: 0 };
+      d.x = PRED.p.x; d.y = PRED.p.y; if (inp.dx || inp.dy) d.walk += dt * 12;
+      continue;
+    }
     if (!d || Math.abs(d.x - tx) + Math.abs(d.y - ty) > 2) d = R.disp[s] = { x: tx, y: ty, walk: 0 };
     const k = Math.min(1, dt * 16);
     d.x += (tx - d.x) * k; d.y += (ty - d.y) * k;
@@ -1697,6 +1746,12 @@ function drawBoard(S, dt, now) {
       else if (ITEM_ICON[c]) drawItem(c, x, y, now);
     }
     for (const b of bombRows[y] || []) drawBomb(b, now);
+    const pb = R.pendingBomb;
+    if (pb && (pb.cell / W | 0) === y) {
+      const age = performance.now() - pb.t, here = (S.b || []).some(b => Math.round(b[1] / 100) * W + Math.round(b[0] / 100) === pb.cell);
+      if (here || age > 1500) R.pendingBomb = null;
+      else { ctx.save(); ctx.globalAlpha = 0.55; drawBomb([(pb.cell % W) * 100, y * 100, 26, mySeat(S), 0, -1], now); ctx.restore(); }
+    }
     // players whose rounded y == row
     const order = [];
     for (let s = 0; s < 4; s++) { const d = R.disp[s]; if (d && Math.round(d.y) === y) order.push(s); }
@@ -1974,7 +2029,7 @@ function visibility(S, s) {
 }
 function drawPlayer(S, s, now) {
   const p = S.p[s], d = R.disp[s]; if (!p || !d) return;
-  const st = p[2], dir = p[3], inv = p[12];
+  const st = p[2], dir = (PRED.on && PRED.p && s === PRED.seat) ? PRED.p.dir : p[3], inv = p[12];
   const cx = SX(d.x), base = SY(d.y);
   let alpha = 1, lift = 0, scale = 1;
   if (st === 2) {
@@ -2077,6 +2132,10 @@ function updateHud() {
   else if (S.ph === 'pick') { tm.textContent = '🎯 Chọn đặc tính'; tm.className = ''; }
   else if (S.ph === 'end') { tm.textContent = 'Kết thúc'; tm.className = ''; }
   else { tm.textContent = (S.sd ? '⚠️ ' : '⏱ ') + fmtTime(S.tl); tm.className = S.sd ? 'sd' : ''; }
+  if (IS_WEB && app.mode === 'online' && app.nroom?.rtt) {
+    const ms2 = app.nroom.rtt(); const nt = $('netTag');
+    if (ms2) { nt.style.display = ''; nt.textContent = '📶 ' + ms2 + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Độ trễ tới máy chủ phòng'; }
+  }
   const mi = MAP_INFO[S?.mp]; $('mapTag').textContent = mi ? mi.name + ({ 19: ' · Vừa', 23: ' · Siêu lớn' }[S.W] || '') : '';
   // role
   const ms = mySeat(S);
@@ -2209,7 +2268,7 @@ function floatEmoji(e, who) {
 }
 
 // ---------- input ----------
-const inp = { dx: 0, dy: 0, b: 0, nd: 0 };
+const inp = { dx: 0, dy: 0, b: 0, nd: 0, bc: -1 };
 const dirStack = [];
 const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
 const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -2220,7 +2279,12 @@ function applyDir() {
 }
 function pressDir(d) { hintTouch(); const k = dirStack.indexOf(d); if (k >= 0) dirStack.splice(k, 1); dirStack.push(d); applyDir(); }
 function releaseDir(d) { const k = dirStack.indexOf(d); if (k >= 0) dirStack.splice(k, 1); applyDir(); }
-function pressBomb() { inp.b = (inp.b + 1) % 1000; sendInput(); }
+function pressBomb() {
+  inp.b = (inp.b + 1) % 1000;
+  if (PRED.on && PRED.p) { inp.bc = Math.round(PRED.p.y) * W + Math.round(PRED.p.x); R.pendingBomb = { cell: inp.bc, t: performance.now() }; }
+  else inp.bc = -1;
+  sendInput();
+}
 function pressNeedle() { inp.nd = (inp.nd + 1) % 1000; sendInput(); }
 const typing = () => { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT'); };
 window.addEventListener('keydown', e => {
@@ -2297,7 +2361,7 @@ let inpTimer = 0;
 function sendInput() {
   if (app.mode !== 'online' || app.isHost || !app.nroom) return;
   clearTimeout(inpTimer);
-  app.nroom.presence({ inp: { dx: inp.dx, dy: inp.dy, b: inp.b, nd: inp.nd } }).catch(() => {});
+  app.nroom.presence({ inp: { dx: inp.dx, dy: inp.dy, b: inp.b, nd: inp.nd, bc: inp.bc } }).catch(() => {});
 }
 
 // ---------- pause ----------
@@ -2516,7 +2580,7 @@ function hostTick(dt) {
     const key = i + ':' + seat.peer, li = host.lastIn[key];
     const bomb = li ? src.b !== li.b : false, needle = li ? src.nd !== li.nd : false;
     host.lastIn[key] = { b: src.b, nd: src.nd };
-    inputs[i] = { dx: Math.sign(src.dx | 0), dy: Math.sign(src.dy | 0), bomb, needle };
+    inputs[i] = { dx: Math.sign(src.dx | 0), dy: Math.sign(src.dy | 0), bomb, needle, cell: seat.peer === app.myPeer ? -1 : (typeof src.bc === 'number' ? src.bc : -1) };
   }
   if (host.paused && g.phase !== 'lobby') {
     // frozen
@@ -2539,7 +2603,11 @@ function hostTick(dt) {
   setState(snap);
   snap.k = host.tick;
   if (app.mode === 'online' && app.nroom && host.tick % 2 === 0 && PRES_TX) {
-    app.nroom.presence({ st: snap }).catch(() => {});
+    // the map rarely changes: only send it when it does (and every ~2 s for late joiners)
+    const wire = { ...snap };
+    if (snap.m === host.lastM && host.tick - host.lastMTick < 60 && host.lastMrk === snap.rk) delete wire.m;
+    else { host.lastM = snap.m; host.lastMTick = host.tick; host.lastMrk = snap.rk; }
+    app.nroom.presence({ st: wire }).catch(() => {});
   } else if (app.mode === 'online' && app.nroom && host.tick % 2 === 0) {
     app.nroom.emit('st', snap).catch(err => {
       if (err && err.code === 'not_permitted') { toast('Tài khoản này không có quyền làm host (cần quyền chỉnh sửa trở lên).', 4000); stopHosting(); }
@@ -2680,7 +2748,12 @@ $('hpCm').addEventListener('keydown', e => { if (e.key === 'Enter') sendCm(); e.
 // ================= STATE / NETWORK =================
 function validDims(st) {
   const w = st.W || 15, h = st.H || 13;
-  return typeof st.m === 'string' && w >= 9 && w <= 31 && h >= 9 && h <= 25 && st.m.length === w * h;
+  if (!(w >= 9 && w <= 31 && h >= 9 && h <= 25)) return false;
+  if (st.m === undefined) { // delta snapshot: reuse the last map of the same round
+    const p = app.S; if (!p || p.rk !== st.rk || (p.W || 15) !== w || (p.H || 13) !== h || typeof p.m !== 'string') return false;
+    st.m = p.m; return true;
+  }
+  return typeof st.m === 'string' && st.m.length === w * h;
 }
 function setState(S) {
   const w = S.W || 15, h = S.H || 13;
@@ -2909,7 +2982,7 @@ if (EMBED) {
 window.addEventListener('resize', layout);
 layout();
 requestAnimationFrame(frame);
-window.__boom = { app, host, SIM, R, visibility };
+window.__boom = { app, host, SIM, R, visibility, PRED };
 return api;
 }
 

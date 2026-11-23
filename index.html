@@ -56,7 +56,7 @@ input:focus,select:focus{border-color:var(--acc)}
 #reacts button{padding:3px 7px;font-size:18px;background:#1c2b48}
 #banner{left:50%;transform:translateX(-50%);bottom:18px;max-width:min(680px,calc(100% - 600px));min-width:260px;padding:10px 18px;text-align:center;font-size:20px;font-weight:700;display:none;border-color:rgba(255,201,60,.5)}
 #banner .who{font-size:12px;color:#ffd36b;letter-spacing:1px;text-transform:uppercase}
-#center{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:5}
+#center{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:8}
 #center .big{font-size:110px;font-weight:800;text-shadow:0 6px 0 rgba(0,0,0,.35),0 0 40px rgba(79,195,255,.6)}
 #center .res{font-size:44px;font-weight:800;text-shadow:0 4px 0 rgba(0,0,0,.4)}
 #center .sm{font-size:18px;color:#d6e6ff;text-shadow:0 2px 6px #000}
@@ -150,6 +150,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 .scr{display:flex;gap:6px;align-items:center}.scr select{flex:1}
 .occ{flex:1;font-weight:700;padding:5px 8px;border-radius:9px;background:rgba(255,255,255,.07);border-left:4px solid var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .unseat{padding:4px 9px;background:#5a2a36}
+#touch.idle{display:none!important}
 .igf{grid-column:1/-1;font-size:15.5px;color:#ffe08a;border-top:1px dashed rgba(255,255,255,.12);padding-top:6px;margin-top:2px}
 .stbl td.pts{color:#ffd36b}
 .sboard{margin:10px auto 8px;width:min(420px,calc(100vw - 40px));background:rgba(10,18,34,.88);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:8px 12px;text-align:left}
@@ -179,8 +180,8 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
 #keyHint{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;font-size:13px;color:#cfe0ff;background:rgba(10,18,34,.7);border:1px solid var(--line);border-radius:99px;padding:4px 14px;pointer-events:none;z-index:4;white-space:nowrap;transition:opacity .6s}
 @media (max-width:700px){.hgrid{grid-template-columns:1fr}.hk span{white-space:normal}}
 #toast{left:50%;top:76px;transform:translateX(-50%);padding:8px 16px;display:none;z-index:30;font-weight:700}
-#touch{position:fixed;inset:auto 0 0 0;height:230px;display:none;z-index:6;pointer-events:none}
-#touch .joyzone{position:absolute;left:0;bottom:0;width:55%;height:100%;pointer-events:auto;touch-action:none}
+#touch{position:fixed;inset:auto 0 0 0;height:200px;display:none;z-index:6;pointer-events:none}
+#touch .joyzone{position:absolute;left:0;bottom:0;width:190px;height:190px;pointer-events:auto;touch-action:none}
 #touch .joy{position:absolute;left:24px;bottom:24px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.10),rgba(255,255,255,.18));border:2px solid rgba(255,255,255,.28);box-shadow:inset 0 0 20px rgba(0,0,0,.25);transition:opacity .2s}
 #touch .joyarr{position:absolute;left:50%;top:6px;transform:translateX(-50%);font-size:14px;color:rgba(255,255,255,.45)}
 #touch .joyarr.d{top:auto;bottom:6px}#touch .joyarr.l{left:10px;top:50%;transform:translateY(-50%)}#touch .joyarr.r{left:auto;right:10px;top:50%;transform:translateY(-50%)}
@@ -262,7 +263,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   .pkl{font-size:12px;margin-top:5px}
   .sboard{display:none}.wincard img{height:70px}.wincard{min-width:110px;padding:5px 8px}.wpn{font-size:16px}#center .res{font-size:26px}
   #touch{inset:50px 0 0 0;height:auto}
-  #touch .joyzone{width:42%;height:100%}
+  #touch .joyzone{width:170px;height:170px}
   #touch .joy{left:16px;bottom:12px;width:124px;height:124px}
   #touch .knob{width:54px;height:54px;margin:-27px 0 0 -27px}
   #touch .acts{right:12px;bottom:12px;flex-direction:column-reverse;align-items:center;gap:8px}
@@ -2282,6 +2283,9 @@ function updateHud() {
   $('bHost').className = app.isHost ? 'on' : '';
   $('bHost').textContent = app.isHost ? '🎙️ Thôi host' : '🎙️ Host';
   $('bPanel').style.display = app.isHost ? '' : 'none';
+  // touch controls only while we actually control a character in a running round
+  const playingNow = ms >= 0 && S && (S.ph === 'play' || S.ph === 'count') && !S.pz;
+  $('touch').classList.toggle('idle', !playingNow);
   const pz = !!S?.pz, bp = $('bPause');
   bp.textContent = pz ? '▶' : '⏸'; bp.classList.toggle('paused', pz);
   bp.title = app.isHost ? (pz ? 'Tiếp tục (P)' : 'Tạm dừng (P)') : 'Chỉ host mới tạm dừng được';

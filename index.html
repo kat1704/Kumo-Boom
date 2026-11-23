@@ -1126,7 +1126,30 @@ if (typeof module !== 'undefined') module.exports = SIM;
   ];
   const NS = 'boom25d-vn1/';
   const HB = 2000, STALE = 9000;
-  const RTC_CFG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }, { urls: 'stun:stun.cloudflare.com:3478' }] };
+  const STUN = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
+  const RTC_CFG = { iceServers: STUN.slice() };
+  // Cloudflare TURN relay (via the owner's Worker): used only when a direct link is blocked by the network
+  const TURN_URL = 'https://kumo-boom.trunganh1704.workers.dev/';
+  let turnAt = 0, turnP = null, turnOk = false;
+  function refreshTurn() {
+    if (turnP || (turnOk && Date.now() - turnAt < 20 * 3600e3)) return turnP || Promise.resolve();
+    turnP = (async () => {
+      try {
+        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+        const res = await fetch(TURN_URL, { cache: 'no-store', signal: ctl.signal });
+        clearTimeout(t);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        let ice = data && data.iceServers;
+        if (ice && !Array.isArray(ice)) ice = [ice];
+        ice = (ice || []).filter(x => x && x.urls);
+        if (ice.length) { RTC_CFG.iceServers = STUN.concat(ice); turnOk = true; turnAt = Date.now(); }
+      } catch (e) { console.warn('TURN unavailable, direct links only', e); }
+      finally { turnP = null; }
+    })();
+    return turnP;
+  }
+  refreshTurn();
   const HAS_RTC = typeof window.RTCPeerConnection === 'function';
   // fresh id per page load (MQTT keeps it across auto-reconnects; a reload says 'bye' and comes back as a new id)
   const CID = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -1217,12 +1240,22 @@ if (typeof module !== 'undefined') module.exports = SIM;
     }
     async function makeLink(id, offerSdp) {
       if (!HAS_RTC || left) return;
+      await refreshTurn();
       killLink(id);
       const pc = new RTCPeerConnection(RTC_CFG), l = { pc, dc: null, ready: false };
       links.set(id, l);
       const setup = dc => {
         l.dc = dc;
-        dc.onopen = () => { l.ready = true; try { dc.send(enc({ id: myId, p: myPres, q: ++seq })); } catch (e) { /* ignore */ } };
+        dc.onopen = () => {
+          l.ready = true; try { dc.send(enc({ id: myId, p: myPres, q: ++seq })); } catch (e) { /* ignore */ }
+          setTimeout(async () => { // was it relayed through TURN?
+            try {
+              const st = await pc.getStats(); let pairId = null; const cands = {};
+              st.forEach(x => { if (x.type === 'transport' && x.selectedCandidatePairId) pairId = x.selectedCandidatePairId; if (x.type === 'local-candidate') cands[x.id] = x; });
+              st.forEach(x => { if (x.type === 'candidate-pair' && (x.id === pairId || (!pairId && x.nominated && x.state === 'succeeded'))) { const lc = cands[x.localCandidateId]; l.relay = !!(lc && lc.candidateType === 'relay'); l.ms = Math.round((x.currentRoundTripTime || 0) * 1000); } });
+            } catch (e) { /* ignore */ }
+          }, 1500);
+        };
         dc.onclose = () => { if (links.get(id) === l) killLink(id, true); };
         dc.onmessage = e => { const m = dec(e.data); if (m && m.id === id) applyPres(id, m); };
       };
@@ -1326,9 +1359,14 @@ if (typeof module !== 'undefined') module.exports = SIM;
       connected: () => ok,
       onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
       async leave() { if (left) return; pub('bye', { id: myId }); left = true; setOk(false); for (const id of [...links.keys()]) killLink(id); try { client && client.end(); } catch (e) { /* ignore */ } },
-      links: () => ({ ready: readyLinks(), total: Math.max(0, peers.size - 1) }),
+      links: () => {
+        let relay = 0;
+        for (const l of links.values()) if (l.ready && l.relay) relay++;
+        return { ready: readyLinks(), total: Math.max(0, peers.size - 1), relay, turn: turnOk };
+      },
       count: () => peers.size,
       rtt: () => rtt,
+      linkMs: () => { let m = 0; for (const l of links.values()) if (l.ready && l.ms) m = Math.max(m, l.ms); return m; },
       get broker() { return BROKERS[brokerIdx]; },
       _start: start,
       get _dbg() { return { myId, ok, broker: BROKERS[brokerIdx], peers: [...peers.keys()] }; },
@@ -2210,7 +2248,8 @@ function updateHud() {
   if (IS_WEB && app.mode === 'online' && app.nroom?.rtt) {
     const ms2 = app.nroom.rtt(), lk = app.nroom.links ? app.nroom.links() : { ready: 0, total: 0 }, nt = $('netTag');
     nt.style.display = '';
-    if (lk.total && lk.ready === lk.total) { nt.textContent = '⚡ Trực tiếp'; nt.style.background = '#1f6b3a'; nt.title = 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
+    const lms = app.nroom.linkMs ? app.nroom.linkMs() : 0;
+    if (lk.total && lk.ready === lk.total) { nt.textContent = (lk.relay ? '⚡ Cloudflare' : '⚡ Trực tiếp') + (lms ? ' ' + lms + 'ms' : ''); nt.style.background = '#1f6b3a'; nt.title = lk.relay ? 'Kết nối qua máy chủ chuyển tiếp Cloudflare gần bạn' : 'Đang nối thẳng với tất cả mọi người trong phòng (độ trễ thấp nhất)'; }
     else if (lk.ready) { nt.textContent = `⚡ ${lk.ready}/${lk.total} trực tiếp`; nt.style.background = '#5a6a1a'; nt.title = 'Một số người đi qua máy chủ trung chuyển'; }
     else if (ms2) { nt.textContent = '☁️ ' + ms2 + 'ms'; nt.style.background = ms2 < 150 ? '#1f6b3a' : ms2 < 350 ? '#8a6a1a' : '#8a2a2a'; nt.title = 'Đang đi qua máy chủ trung chuyển'; }
   }

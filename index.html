@@ -1144,17 +1144,23 @@ if (typeof module !== 'undefined') module.exports = SIM;
   const STUN = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
   const RTC_CFG = { iceServers: STUN.slice() };
   // Cloudflare TURN relay (via the owner's Worker): used only when a direct link is blocked by the network
-  const TURN_URL = 'https://kumo-boom.trunganh1704.workers.dev/';
+  const TURN_URLS = ['https://boom-kumo.trunganh1704.workers.dev/', 'https://kumo-boom.trunganh1704.workers.dev/'];
   let turnAt = 0, turnP = null, turnOk = false, turnErr = 'đang lấy…';
   function refreshTurn() {
     if (turnP || (turnOk && Date.now() - turnAt < 20 * 3600e3)) return turnP || Promise.resolve();
     turnP = (async () => {
       try {
-        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
-        const res = await fetch(TURN_URL, { cache: 'no-store', signal: ctl.signal });
-        clearTimeout(t);
-        if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text().catch(() => '')).slice(0, 80));
-        const data = await res.json();
+        let data = null, err = null;
+        for (const u of TURN_URLS) {
+          try {
+            const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+            const res = await fetch(u, { cache: 'no-store', signal: ctl.signal });
+            clearTimeout(t);
+            if (!res.ok) throw new Error(u.slice(8, 17) + '…: HTTP ' + res.status + ' ' + (await res.text().catch(() => '')).slice(0, 80));
+            data = await res.json(); break;
+          } catch (e) { err = err || e; }
+        }
+        if (!data) throw err;
         let ice = data && data.iceServers;
         if (ice && !Array.isArray(ice)) ice = [ice];
         ice = (ice || []).filter(x => x && x.urls);

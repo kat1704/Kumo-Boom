@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Boom 2.5D</title>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1102,38 +1101,47 @@ if (typeof module !== 'undefined') module.exports = SIM;
 
 </script>
 <script>
-// ===== P2P room for the standalone web build (no accounts) =====
-// Mimics the subset of the claude.ai `room` capability the game uses:
-// join(name) -> { presence, peers, onPeers, emit, on, connected, onConnection, leave }
-// Topology: the first browser to claim the room id becomes the "hub" and relays
-// presence + messages for everyone else (star network over WebRTC via PeerJS).
+// ===== Room over a public MQTT broker (standalone web build, no accounts, works on any network) =====
+// Same subset of the claude.ai `room` API the game uses: join(name) -> { presence, peers, onPeers, emit, on, connected, onConnection, leave }
 (() => {
   if (window.claude && typeof window.claude.use === 'function') return; // running inside claude.ai
-  const PREFIX = 'boom25d-vn-v1-';
-  // one stable identity per browser tab: the hub uses it to drop stale duplicates of the same person
-  let CID = '';
-  try { CID = sessionStorage.getItem('boom.cid') || ''; } catch (e) { /* ignore */ }
-  if (!CID) { CID = Math.random().toString(36).slice(2) + Date.now().toString(36); try { sessionStorage.setItem('boom.cid', CID); } catch (e) { /* ignore */ } }
+  const BROKERS = [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt',
+  ];
+  const LIBS = [
+    'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js',
+    'https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js',
+  ];
+  const NS = 'boom25d-vn1/';
   const HB = 2000, STALE = 9000;
-  const PEER_OPTS = {
-    debug: 0,
-    config: { iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' },
-    ] },
-  };
+  // fresh id per page load (MQTT keeps it across auto-reconnects; a reload says 'bye' and comes back as a new id)
+  const CID = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+  function loadScript(src) {
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.async = true; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  }
+  let libP = null;
+  function loadLib() {
+    if (window.mqtt) return Promise.resolve();
+    if (libP) return libP;
+    libP = (async () => {
+      for (const u of LIBS) { try { await loadScript(u); if (window.mqtt) return; } catch (e) { /* try next */ } }
+      libP = null;
+      throw { code: 'upstream_error', message: 'Không tải được thư viện kết nối, kiểm tra mạng' };
+    })();
+    return libP;
+  }
+  const enc = o => JSON.stringify(o);
+  const dec = b => { try { return JSON.parse(typeof b === 'string' ? b : new TextDecoder().decode(b)); } catch (e) { return null; } };
 
   function makeRoom(name) {
-    const hubId = PREFIX + name;
+    const base = NS + name + '/';
     const peerHandlers = [], connHandlers = [], topics = {};
-    const peers = new Map(); // id -> { presence, at }
-    let myId = null, myPres = { _cid: CID }, isHub = false, peer = null, hubConn = null, ok = false, left = false;
-    let starting = null, lostT = 0, lastHub = 0;
-    const clients = new Map(); // hub only: id -> DataConnection
-    const seen = new Map(); // hub only: id -> last message time
-    const cidOf = new Map(); // hub only: id -> client identity
-    let J = new Set(), U = new Set(), L = [], fireT = 0, presT = 0, retryT = 0;
+    const peers = new Map(); // id -> { presence, at, heard }
+    let myId = CID, myPres = {}, client = null, ok = false, left = false, presT = 0, lastSent = 0, brokerIdx = 0;
+    let J = new Set(), U = new Set(), L = [], fireT = 0;
 
     const snapshot = () => [...peers.entries()].map(([id, v]) => Object.freeze({ peer: id, by: null, isMe: id === myId, sameTab: id === myId, kind: 'viewer', guest: false, presence: v.presence, updatedAt: v.at }));
     function schedule() { if (!fireT) fireT = setTimeout(fire, 16); }
@@ -1146,193 +1154,101 @@ if (typeof module !== 'undefined') module.exports = SIM;
     }
     function setPres(id, p) {
       const had = peers.has(id);
-      peers.set(id, { presence: Object.freeze(p || {}), at: Date.now() });
+      peers.set(id, { presence: Object.freeze(p || {}), at: Date.now(), heard: Date.now() });
       (had ? U : J).add(id); schedule();
     }
     function drop(id) {
-      const v = peers.get(id); if (!v) return;
+      const v = peers.get(id); if (!v || id === myId) return;
       peers.delete(id); J.delete(id); U.delete(id);
       L.push(Object.freeze({ peer: id, by: null, isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: v.presence })); schedule();
     }
     function deliver(topic, data, from) {
       (topics[topic] || []).forEach(h => { try { h({ topic, data, peer: from, by: null, isMe: from === myId, sameTab: from === myId, kind: 'viewer', guest: false }); } catch (e) { console.error(e); } });
     }
-    function setOk(v) { if (ok !== v) { ok = v; connHandlers.forEach(h => h(v)); } }
-    const send = (c, m) => { try { if (c && c.open) c.send(m); } catch (e) { /* ignore */ } };
+    function setOk(v) { if (ok !== v) { ok = v; connHandlers.forEach(h => { try { h(v); } catch (e) { /* ignore */ } }); } }
+    function pub(sub, obj) { if (client && ok) { try { client.publish(base + sub, enc(obj), { qos: 0, retain: false }); } catch (e) { /* ignore */ } } }
+    function sendPres(hello) { lastSent = Date.now(); pub('p', { id: myId, p: myPres, h: hello ? 1 : 0 }); }
 
-    // ---- hub side ----
-    function hubBroadcast(m, except) { for (const [id, c] of clients) if (id !== except) send(c, m); }
-    function evict(id, why) {
-      const c = clients.get(id);
-      if (why) send(c, { t: 'kick', why });
-      clients.delete(id); seen.delete(id); cidOf.delete(id);
-      try { c && c.close(); } catch (e) { /* ignore */ }
-      if (peers.has(id)) { drop(id); hubBroadcast({ t: 'leave', id }); }
-    }
-    function hubAccept(c) {
-      c.on('open', () => {
-        clients.set(c.peer, c); seen.set(c.peer, Date.now());
-        send(c, { t: 'all', peers: [...peers.entries()].map(([id, v]) => [id, v.presence]) });
-      });
-      c.on('data', m => {
-        if (!m || typeof m !== 'object') return;
-        seen.set(c.peer, Date.now());
-        if (m.t === 'ping') return;
-        if (m.t === 'pres') {
-          const cid = m.p && m.p._cid;
-          if (cid) { // same person reconnected with a new id: remove the old copies
-            if (cid === CID) { evict(c.peer); return; }
-            for (const [id, x] of cidOf) if (x === cid && id !== c.peer) evict(id, 'dup');
-            cidOf.set(c.peer, cid);
-          }
-          setPres(c.peer, m.p); hubBroadcast({ t: 'pres', id: c.peer, p: m.p }, c.peer);
-        }
-        else if (m.t === 'emit') { deliver(m.topic, m.data, c.peer); hubBroadcast({ t: 'emit', id: c.peer, topic: m.topic, data: m.data }, c.peer); }
-      });
-      const gone = () => { if (clients.get(c.peer) === c) evict(c.peer); };
-      c.on('close', gone); c.on('error', gone);
+    function onMessage(topic, payload) {
+      const m = dec(payload); if (!m || typeof m !== 'object' || typeof m.id !== 'string') return;
+      if (m.id === myId) return;
+      const sub = topic.slice(base.length);
+      if (sub === 'p') {
+        setPres(m.id, m.p && typeof m.p === 'object' ? m.p : {});
+        if (m.h) setTimeout(() => sendPres(false), Math.random() * 300); // greet newcomers
+      } else if (sub === 'bye') drop(m.id);
+      else if (sub.startsWith('e/')) { const v = peers.get(m.id); if (v) v.heard = Date.now(); deliver(sub.slice(2), m.d, m.id); }
     }
 
-    // ---- client side ----
-    function clientData(m) {
-      if (!m || typeof m !== 'object') return;
-      lastHub = Date.now();
-      if (m.t === 'ping') return;
-      if (m.t === 'kick' && m.why === 'dup') {
-        // another live tab shares our identity (e.g. a duplicated tab): take a fresh one so we stop replacing each other
-        CID = Math.random().toString(36).slice(2) + Date.now().toString(36);
-        try { sessionStorage.setItem('boom.cid', CID); } catch (e) { /* ignore */ }
-        myPres = { ...myPres, _cid: CID };
-        return;
+    function connectTo(url) {
+      return new Promise((resolve, reject) => {
+        const c = window.mqtt.connect(url, {
+          clientId: 'b25_' + myId + '_' + Math.random().toString(36).slice(2, 6),
+          keepalive: 15, reconnectPeriod: 2500, connectTimeout: 7000, clean: true,
+          will: { topic: base + 'bye', payload: enc({ id: myId }), qos: 0, retain: false },
+        });
+        let settled = false;
+        const to = setTimeout(() => { if (!settled) { settled = true; try { c.end(true); } catch (e) { /* ignore */ } reject(new Error('timeout')); } }, 8000);
+        c.on('connect', () => {
+          c.subscribe(base + '#', { qos: 0 }, () => {
+            if (!settled) { settled = true; clearTimeout(to); resolve(c); }
+            else { setOk(true); sendPres(true); } // re-connected later
+          });
+        });
+        c.on('message', onMessage);
+        c.on('close', () => setOk(false));
+        c.on('offline', () => setOk(false));
+        c.on('error', () => { if (!settled) { settled = true; clearTimeout(to); try { c.end(true); } catch (e) { /* ignore */ } reject(new Error('error')); } });
+      });
+    }
+
+    async function start() {
+      await loadLib();
+      let lastErr = null;
+      for (let i = 0; i < BROKERS.length; i++) {
+        try { client = await connectTo(BROKERS[i]); brokerIdx = i; break; } catch (e) { lastErr = e; client = null; }
       }
-      if (m.t === 'all') { for (const [id, p] of m.peers) if (id !== myId) setPres(id, p); send(hubConn, { t: 'pres', p: myPres }); }
-      else if (m.t === 'pres') { if (m.id !== myId) setPres(m.id, m.p); }
-      else if (m.t === 'leave') drop(m.id);
-      else if (m.t === 'emit') deliver(m.topic, m.data, m.id);
-    }
-
-    function lostHub() {
-      if (left || lostT || starting) return;
-      setOk(false);
-      for (const id of [...peers.keys()]) drop(id); // includes our old id: we get a new one on rejoin
-      myId = null;
-      try { peer && peer.destroy(); } catch (e) { /* ignore */ }
-      peer = null; hubConn = null; isHub = false;
-      clearTimeout(retryT);
-      lostT = 1;
-      retryT = setTimeout(() => { lostT = 0; start().catch(() => { lostT = 0; setTimeout(lostHub, 1500); }); }, 400 + Math.random() * 1600); // someone becomes the new hub
-    }
-
-    function start() {
-      if (starting) return starting;
-      try { peer && peer.destroy(); } catch (e) { /* ignore */ }
-      peer = null; hubConn = null; isHub = false;
-      const made = [];
-      const track = p => { made.push(p); return p; };
-      starting = new Promise((resolve, reject) => {
-        let done = false;
-        const finish = (err) => {
-          if (done) return; done = true; clearTimeout(to);
-          if (err) { for (const p of made) { try { p.destroy(); } catch (e) { /* ignore */ } } peer = null; hubConn = null; isHub = false; }
-          err ? reject(err) : resolve();
-        };
-        const to = setTimeout(() => finish({ code: 'upstream_error', message: 'Không kết nối được (hết thời gian chờ)' }), 15000);
-        // 1) try to become the hub
-        const hp = track(new window.Peer(hubId, PEER_OPTS));
-        hp.on('open', id => {
-          peer = hp; isHub = true; myId = id;
-          hp.on('connection', hubAccept);
-          setPres(myId, myPres); setOk(true); finish();
-        });
-        hp.on('error', err => {
-          if (err && err.type === 'unavailable-id' && done && isHub) {
-            // we lost the room id while disconnected and someone else claimed it: merge into their room
-            isHub = false; for (const c of clients.values()) { try { c.close(); } catch (e) { /* ignore */ } } clients.clear();
-            lostHub(); return;
-          }
-          if (err && err.type === 'unavailable-id') {
-            try { hp.destroy(); } catch (e) { /* ignore */ }
-            // 2) room exists: join it as a client
-            const cp = track(new window.Peer(PEER_OPTS));
-            cp.on('open', id => {
-              peer = cp; isHub = false; myId = id;
-              const c = cp.connect(hubId, { reliable: true, serialization: 'json' });
-              hubConn = c;
-              c.on('open', () => { if (done) { try { cp.destroy(); } catch (e) { /* ignore */ } return; } lastHub = Date.now(); setPres(myId, myPres); send(c, { t: 'pres', p: myPres }); setOk(true); finish(); });
-              c.on('data', clientData);
-              c.on('close', lostHub); c.on('error', lostHub);
-            });
-            cp.on('error', e2 => {
-              if (e2 && e2.type === 'peer-unavailable') { // stale room id: retry shortly
-                try { cp.destroy(); } catch (e) { /* ignore */ }
-                if (!done) { clearTimeout(to); done = true; setTimeout(() => { starting = null; start().then(resolve, reject); }, 1200); }
-                else lostHub();
-              } else if (!ok && !done) finish({ code: 'upstream_error', message: String(e2 && e2.type || e2) });
-            });
-            cp.on('disconnected', () => { try { cp.reconnect(); } catch (e) { /* ignore */ } });
-          } else if (!done) finish({ code: 'upstream_error', message: String(err && err.type || err) });
-        });
-        hp.on('disconnected', () => { if (isHub && !left) setTimeout(() => { try { if (!hp.destroyed) hp.reconnect(); } catch (e) { /* ignore */ } }, 300); });
-      });
-      const p = starting;
-      p.then(() => { if (starting === p) starting = null; }, () => { if (starting === p) starting = null; });
-      return p;
-    }
-
-    function flushPres() {
-      presT = 0;
-      if (!myId) return;
+      if (!client) throw { code: 'upstream_error', message: 'Không kết nối được máy chủ phòng (' + (lastErr && lastErr.message || 'lỗi mạng') + ')' };
       setPres(myId, myPres);
-      if (isHub) hubBroadcast({ t: 'pres', id: myId, p: myPres });
-      else send(hubConn, { t: 'pres', p: myPres });
+      setOk(true);
+      sendPres(true);
     }
 
     setInterval(() => {
-      if (left || !peer || starting) return;
+      if (left || !ok) return;
       const now = Date.now();
-      if (isHub) {
-        if (peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch (e) { /* ignore */ } }
-        hubBroadcast({ t: 'ping' });
-        for (const [id, t] of seen) if (now - t > STALE) evict(id); // silent clients are gone
-      } else if (ok) {
-        send(hubConn, { t: 'ping' });
-        if (now - lastHub > STALE) lostHub(); // hub went silent
-      }
-    }, HB);
-    const api = {
+      if (now - lastSent > HB) sendPres(false); // heartbeat
+      for (const [id, v] of peers) if (id !== myId && now - v.heard > STALE) drop(id); // silent = gone
+    }, 1000);
+    window.addEventListener('beforeunload', () => { if (!left) { pub('bye', { id: myId }); left = true; } });
+    window.addEventListener('pagehide', () => { pub('bye', { id: myId }); });
+
+    return {
       name,
       async presence(patch) {
         const n = { ...myPres };
         for (const k in patch) { if (patch[k] === null) delete n[k]; else n[k] = patch[k]; }
-        n._cid = CID;
         myPres = n;
-        if (!presT) presT = setTimeout(flushPres, 33);
+        if (!presT) presT = setTimeout(() => { presT = 0; setPres(myId, myPres); sendPres(false); }, 33);
       },
-      async emit(topic, data) {
-        if (!ok) return;
-        deliver(topic, data, myId);
-        if (isHub) hubBroadcast({ t: 'emit', id: myId, topic, data });
-        else send(hubConn, { t: 'emit', topic, data });
-      },
+      async emit(topic, data) { if (!ok) return; deliver(topic, data, myId); pub('e/' + topic, { id: myId, d: data }); },
       on(topic, h) { (topics[topic] = topics[topic] || []).push(h); return () => { topics[topic] = (topics[topic] || []).filter(x => x !== h); }; },
       peers: snapshot,
       onPeers(h) { peerHandlers.push(h); setTimeout(() => h({ peers: snapshot(), joined: snapshot(), left: [], updated: [] }), 0); return () => { const i = peerHandlers.indexOf(h); if (i >= 0) peerHandlers.splice(i, 1); }; },
       connected: () => ok,
       onConnection(h) { connHandlers.push(h); setTimeout(() => h(ok), 0); return () => {}; },
-      async leave() { left = true; clearTimeout(retryT); try { peer && peer.destroy(); } catch (e) { /* ignore */ } setOk(false); },
-      _start: start,
+      async leave() { if (left) return; pub('bye', { id: myId }); left = true; setOk(false); try { client && client.end(); } catch (e) { /* ignore */ } },
       count: () => peers.size,
-      get _dbg() { return { isHub, myId, ok, peers: [...peers.keys()], clients: [...clients.keys()] }; },
+      get broker() { return BROKERS[brokerIdx]; },
+      _start: start,
+      get _dbg() { return { myId, ok, broker: BROKERS[brokerIdx], peers: [...peers.keys()] }; },
     };
-    window.addEventListener('beforeunload', () => { left = true; try { peer && peer.destroy(); } catch (e) { /* ignore */ } });
-    return api;
   }
 
   const rooms = {};
   const room = {
-    async join(name) {
-      if (!window.Peer) throw { code: 'upstream_error', message: 'Không tải được thư viện kết nối (PeerJS)' };
-      if (rooms[name]) return rooms[name]; // a join already in progress or done: never create a second identity
+    join(name) {
+      if (rooms[name]) return rooms[name]; // never create a second identity for the same room
       const r = makeRoom(name);
       rooms[name] = r._start().then(() => r, err => { delete rooms[name]; r.leave(); throw err; });
       return rooms[name];

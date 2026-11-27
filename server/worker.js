@@ -962,8 +962,8 @@ class RoomHost {
   seatName(S, s) { if (s === -2) return 'Ông Mây Giông'; if (s === -4) return 'Mây Khổng Lồ'; const st = S?.s?.[s]; return st ? (st[1] || 'Ghế ' + (s + 1)) : 'Ghế ' + (s + 1); }
   autoComment(e, S) {
     const f = AUTO[e.k]; let line = null;
-    if (e.k === 'item' && e.b === 'p') line = `${this.seatName(S, e.a)} nhặt được Phách thần! Bom, tốc độ, tia nổ đều tối đa trong 10 giây!`;
-    else if (e.k === 'npcItem') line = 'Ông Mây Giông vừa ném xuống Phách thần, ai sẽ nhanh tay hơn?';
+    if (e.k === 'item' && e.b === 'p') line = `${this.seatName(S, e.a)} nhặt được Naruko! Bom, tốc độ, tia nổ đều tối đa trong 10 giây!`;
+    else if (e.k === 'npcItem') line = 'Ông Mây Giông vừa ném xuống Naruko, ai sẽ nhanh tay hơn?';
     else if (e.k === 'win') line = S.md === 'team' ? `${TEAM_NAME[e.a]} giành chiến thắng chung cuộc!` : `${this.seatName(S, e.a)} là người chiến thắng!`;
     else if (e.k === 'draw') line = 'Hoà rồi! Không ai trụ lại được.';
     else if (f) { const arr = f(this.seatName(S, e.a), this.seatName(S, e.b), e.a === e.b); line = arr[(Math.random() * arr.length) | 0]; }

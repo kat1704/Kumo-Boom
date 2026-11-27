@@ -466,7 +466,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
       <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
-      <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Phách thần (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
+      <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Naruko (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
   <div class="row" style="justify-content:center;margin-top:10px"><button class="pri" id="helpOk">Đã hiểu, vào chơi!</button></div>
@@ -1720,7 +1720,7 @@ const MAXP = 8;
 const COLORS = ['#ff5a5f', '#3fa9f5', '#ffc93c', '#7ed957', '#ff8c42', '#b07cff', '#2fd6c9', '#ff6fb5'];
 const DARK = ['#b8323a', '#1f6fb0', '#c7911a', '#4a9a2c', '#b85a1e', '#6a3fc0', '#1a8a82', '#b83a7a'];
 const ITEM_ICON = { b: '💧', f: '🌊', s: '👟', n: '📌', k: '🦶', t: '🧤', p: '🪇' };
-const ITEM_NAME = { b: 'thêm bom', f: 'tia dài', s: 'giày nhanh', n: 'kim cứu thân', k: 'đá bom', t: 'ném bom', p: 'Phách thần' };
+const ITEM_NAME = { b: 'thêm bom', f: 'tia dài', s: 'giày nhanh', n: 'kim cứu thân', k: 'đá bom', t: 'ném bom', p: 'Naruko' };
 const ITEM_INFO = [
   ['b', 'Mây cộng bom', 'Đặt thêm được 1 quả bom cùng lúc', 'tối đa 8'],
   ['f', 'Mây tia dài', 'Tia nổ dài thêm 1 ô mỗi hướng', 'tối đa 8'],
@@ -1728,7 +1728,7 @@ const ITEM_INFO = [
   ['n', 'Kim cứu thân', 'Đang trong bong bóng: bấm E để tự thoát', 'giữ tối đa 3'],
   ['k', 'Giày đá bom', 'Đi thẳng vào quả bom để đá nó trượt đi đến khi chạm vật cản', 'có / không'],
   ['t', 'Găng ném bom', 'Đứng trên quả bom bấm Space để ném nó xa 3 ô theo hướng đang nhìn (bay qua tường)', 'có / không'],
-  ['p', 'Phách thần', 'Chỉ Ông Mây Giông thỉnh thoảng ném ra. Nhặt được: số bom, tốc độ, tia nổ lên TỐI ĐA trong 10 giây', '10 giây'],
+  ['p', 'Naruko', 'Chỉ Ông Mây Giông thỉnh thoảng ném ra. Nhặt được: số bom, tốc độ, tia nổ lên TỐI ĐA trong 10 giây', '10 giây'],
 ];
 const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang', 'Bot Bánh Mì', 'Bot Kem Que', 'Bot Xôi Gà', 'Bot Chè Bưởi'];
 const TEAM_NAME = ['Đội Đỏ-Vàng', 'Đội Xanh-Lá'];
@@ -2115,9 +2115,9 @@ function handleEvent(e, S) {
   if (e.k === 'win') SFX.win();
   if (e.k === 'start') SFX.go();
   if (e.k === 'kick') { tone(220, 520, 0.1, 'triangle', 0.12); return; }
-  if (e.k === 'npcItem') { [880, 1100, 1320, 1760].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.09, i * 0.07)); addFeed('🪇 Ông Mây Giông ném ra Phách thần! Nhặt nhanh lên!', 'sys'); return; }
+  if (e.k === 'npcItem') { [880, 1100, 1320, 1760].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.09, i * 0.07)); addFeed('🪇 Ông Mây Giông ném ra Naruko! Nhặt nhanh lên!', 'sys'); return; }
   if (e.k === 'powerEnd') return;
-  if (e.k === 'item' && e.b === 'p') { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, f * 1.01, 0.18, 'square', 0.07, i * 0.06)); addFeed(`🪇 ${seatName(S, e.a)} nhặt được Phách thần — sức mạnh tối đa 10 giây!`, 'sys'); return; }
+  if (e.k === 'item' && e.b === 'p') { [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, f * 1.01, 0.18, 'square', 0.07, i * 0.06)); addFeed(`🪇 ${seatName(S, e.a)} nhặt được Naruko — sức mạnh tối đa 10 giây!`, 'sys'); return; }
   if (e.k === 'npc') { noise(0.6, 0.18, 400); tone(90, 40, 0.5, 'sawtooth', 0.06); return; }
   if (e.k === 'tele') {
     const from = Math.floor(e.b / 1000), to = e.b % 1000;
@@ -2675,7 +2675,7 @@ function drawPlayer(S, s, now) {
   const walk = p[10] ? Math.sin(d.walk) : 0;
   const bob = Math.abs(walk) * u * 0.06;
   const col = COLORS[s], dk = DARK[s];
-  // Phách thần power aura
+  // Naruko power aura
   if (p[15] > 0 && st === 0) {
     const k = 0.5 + 0.5 * Math.sin(now * 10);
     const ag = ctx.createRadialGradient(cx, base - T * 0.45, T * 0.1, cx, base - T * 0.45, T * 0.85);
@@ -2926,7 +2926,7 @@ function updateHud() {
     const teamTag = S?.md === 'team' && type ? ` · ${TEAM_NAME[i % 2].replace('Đội ', '')}` : '';
     html += `<div class="seat ${isMySeat(S, i) ? 'me' : ''} ${p && p[2] === 2 ? 'dead' : ''}">
       <div class="dot" style="background:${COLORS[i]}">${status}</div>
-      <div class="mid"><div class="nm">${esc(name)}${st && st[3] ? ` <span class="trb" title="Đặc tính: ${TRAITS[st[3]]?.[1] || ''}">${traitIcon(st[3])}</span>` : ''}</div><div class="sub">${type ? tag + teamTag : ''}</div>${p ? `<div class="its"><span title="Số bom">${iconHTML('b')}${p[4]}</span><span title="Độ dài tia">${iconHTML('f')}${p[5]}</span><span title="Tốc độ">👟${p[6]}</span><span title="Kim">📌${p[7]}</span><span title="Đá bom" class="${p[13] ? '' : 'off'}">🦶</span><span title="Ném bom" class="${p[14] ? '' : 'off'}">🧤</span>${p[15] > 0 ? `<span class="pwr" title="Phách thần: chỉ số tối đa">${iconHTML('p')}${Math.ceil(p[15] / 10)}s</span>` : ''}</div>` : ''}</div>
+      <div class="mid"><div class="nm">${esc(name)}${st && st[3] ? ` <span class="trb" title="Đặc tính: ${TRAITS[st[3]]?.[1] || ''}">${traitIcon(st[3])}</span>` : ''}</div><div class="sub">${type ? tag + teamTag : ''}</div>${p ? `<div class="its"><span title="Số bom">${iconHTML('b')}${p[4]}</span><span title="Độ dài tia">${iconHTML('f')}${p[5]}</span><span title="Tốc độ">👟${p[6]}</span><span title="Kim">📌${p[7]}</span><span title="Đá bom" class="${p[13] ? '' : 'off'}">🦶</span><span title="Ném bom" class="${p[14] ? '' : 'off'}">🧤</span>${p[15] > 0 ? `<span class="pwr" title="Naruko: chỉ số tối đa">${iconHTML('p')}${Math.ceil(p[15] / 10)}s</span>` : ''}</div>` : ''}</div>
       <div class="wins" title="Điểm (hạ gục +1, thắng ván +2)">⭐${S?.sc?.[i] ?? 0}<div class="sub">🏆${S?.w?.[i] ?? 0} · 💥${p ? p[8] : 0}</div></div></div>`;
   }
   // spectators
@@ -3457,8 +3457,8 @@ const AUTO = {
 function queueAutoComment(e, S) {
   const f = AUTO[e.k];
   let line = null;
-  if (e.k === 'item' && e.b === 'p') line = `${seatName(S, e.a)} nhặt được Phách thần! Bom, tốc độ, tia nổ đều tối đa trong 10 giây!`;
-  else if (e.k === 'npcItem') line = 'Ông Mây Giông vừa ném xuống Phách thần, ai sẽ nhanh tay hơn?';
+  if (e.k === 'item' && e.b === 'p') line = `${seatName(S, e.a)} nhặt được Naruko! Bom, tốc độ, tia nổ đều tối đa trong 10 giây!`;
+  else if (e.k === 'npcItem') line = 'Ông Mây Giông vừa ném xuống Naruko, ai sẽ nhanh tay hơn?';
   else if (e.k === 'win') line = S.md === 'team' ? `${TEAM_NAME[e.a]} giành chiến thắng chung cuộc!` : `${seatName(S, e.a)} là người chiến thắng!`;
   else if (e.k === 'draw') line = 'Hoà rồi! Không ai trụ lại được.';
   else if (f) { const arr = f(seatName(S, e.a), seatName(S, e.b), e.a === e.b); line = arr[(Math.random() * arr.length) | 0]; }

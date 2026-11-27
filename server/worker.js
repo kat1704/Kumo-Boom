@@ -50,57 +50,60 @@ const SIM = (() => {
     return 't';
   }
 
-  // a river that winds across the map, different every game, with a few bridges over it
+  // the river: a gently curving cross that splits the map into 4 zones, one bridge on each arm
   function genRiver(rand) {
     const pillar = (x, y) => x % 2 === 0 && y % 2 === 0;
-    for (let tries = 0; tries < 80; tries++) {
-      const horiz = rand() < 0.5, L = horiz ? W : H, S = horiz ? H : W;
-      let o = Math.round((S - 1) / 2 + (rand() * 2 - 1) * Math.max(1, (S - 9) / 2)); // start near the middle, then wander
-      const cells = [];
+    const mx = (W - 1) / 2, my = (H - 1) / 2;
+    // one arm: walks along `L`, drifting at most 1 cell sideways at a time, never two bends in a row
+    const arm = (horiz) => {
+      const L = horiz ? W : H, mid = horiz ? my : mx, cells = [];
+      let o = mid + Math.round(rand() * 2 - 1), calm = 2;
       for (let a = 1; a <= L - 2; a++) {
-        cells.push([a, o]);
-        if (a < L - 2 && rand() < 0.5) { // bend
-          const d = rand() < 0.5 ? -1 : 1, n = rand() < 0.35 ? 2 : 1;
-          for (let k = 0; k < n; k++) { const no = o + d; if (no < 2 || no > S - 3) break; o = no; cells.push([a, o]); }
+        cells.push(horiz ? [a, o] : [o, a]);
+        calm--;
+        if (a < L - 2 && calm <= 0 && rand() < 0.45) {
+          let d = rand() < 0.5 ? -1 : 1;
+          if (Math.abs(o + d - mid) > 2) d = -d;
+          o += d; cells.push(horiz ? [a, o] : [o, a]);
+          calm = 2 + ((rand() * 2) | 0);
         }
       }
-      const water = new Set(cells.map(([a, b]) => horiz ? b * W + a : a * W + b));
-      let ok = true;
-      for (const i of water) if (nearSpawn(i % W, (i / W) | 0)) { ok = false; break; }
-      if (!ok) continue;
-      // bridges: straight bits of river where you can step across
-      const wet = (x, y) => water.has(y * W + x);
-      const cand = [];
-      for (const i of water) {
-        const x = i % W, y = (i / W) | 0;
-        const across = horiz ? [[x, y - 1], [x, y + 1]] : [[x - 1, y], [x + 1, y]];
-        const along = horiz ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]];
-        if (across.some(([cx, cy]) => wet(cx, cy) || cx < 1 || cy < 1 || cx > W - 2 || cy > H - 2)) continue;
-        if (!along.every(([cx, cy]) => wet(cx, cy) || cx < 1 || cy < 1 || cx > W - 2 || cy > H - 2)) continue;
-        cand.push({ i, a: horiz ? x : y, heads: across.map(([cx, cy]) => cy * W + cx) });
-      }
-      const nb = L >= 19 ? 3 : 2;
-      if (cand.length < nb) continue;
-      cand.sort((p, q) => p.a - q.a);
-      const bridge = new Set(), heads = new Set();
-      for (let k = 0; k < nb; k++) { // one bridge in each stretch of the river
-        const lo = Math.floor(cand.length * k / nb), hi = Math.max(lo + 1, Math.floor(cand.length * (k + 1) / nb));
-        const pool = cand.slice(lo, hi).filter(c => [...bridge].every(b => Math.abs((b % W) - (c.i % W)) + Math.abs(((b / W) | 0) - ((c.i / W) | 0)) >= 4));
-        if (!pool.length) continue;
-        const c = pool[Math.floor(rand() * pool.length)];
-        bridge.add(c.i); for (const h of c.heads) heads.add(h);
-      }
-      if (bridge.size < 2) continue;
-      // everyone must be able to reach everyone (crates can be blasted, pillars and water cannot)
-      const blocked = i => { const x = i % W, y = (i / W) | 0; if (x < 1 || y < 1 || x > W - 2 || y > H - 2) return true; if (bridge.has(i) || heads.has(i)) return false; if (water.has(i)) return true; return pillar(x, y); };
+      return cells.map(([x, y]) => y * W + x);
+    };
+    for (let tries = 0; tries < 120; tries++) {
+      const hArm = arm(true), vArm = arm(false), water = new Set([...hArm, ...vArm]);
+      if ([...water].some(i => nearSpawn(i % W, (i / W) | 0))) continue;
+      const wet = (x, y) => water.has(y * W + x), inside = (x, y) => x >= 1 && y >= 1 && x <= W - 2 && y <= H - 2;
+      // a bridge sits on a straight bit, away from where the arms meet, with dry ground on both sides
+      const spot = (cells, horiz, side) => {
+        const out = [];
+        for (const i of cells) {
+          const x = i % W, y = (i / W) | 0, a = horiz ? x : y, m = horiz ? mx : my;
+          if (side < 0 ? a > m - 2 : a < m + 2) continue;
+          if (side < 0 ? a < 2 : a > (horiz ? W : H) - 3) continue;
+          const across = horiz ? [[x, y - 1], [x, y + 1]] : [[x - 1, y], [x + 1, y]];
+          const along = horiz ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]];
+          if (!across.every(([cx, cy]) => inside(cx, cy) && !wet(cx, cy))) continue;
+          if (!along.every(([cx, cy]) => wet(cx, cy))) continue;
+          out.push({ i, heads: across.map(([cx, cy]) => cy * W + cx) });
+        }
+        return out.length ? out[(rand() * out.length) | 0] : null;
+      };
+      const picks = [spot(hArm, true, -1), spot(hArm, true, 1), spot(vArm, false, -1), spot(vArm, false, 1)];
+      if (picks.some(p => !p)) continue;
+      const bridge = new Set(picks.map(p => p.i)), heads = new Set(picks.flatMap(p => p.heads));
+      const blocked = i => { const x = i % W, y = (i / W) | 0; if (!inside(x, y)) return true; if (bridge.has(i) || heads.has(i)) return false; if (water.has(i)) return true; return pillar(x, y); };
       const seen = new Set([SPAWNS[0][1] * W + SPAWNS[0][0]]), q = [...seen];
       while (q.length) { const i = q.pop(); for (const d of [1, -1, W, -W]) { const j = i + d; if (!seen.has(j) && !blocked(j)) { seen.add(j); q.push(j); } } }
       if (!SPAWNS.every(([x, y]) => seen.has(y * W + x))) continue;
       return { water, bridge, heads };
     }
-    // fallback: the old straight river
+    // fallback: the straight cross
     const water = new Set(), bridge = new Set(), heads = new Set();
-    for (let x = 1; x < W - 1; x++) { const i = RIVER_Y * W + x; if (BRIDGES.includes(x)) { bridge.add(i); heads.add(i - W); heads.add(i + W); } else water.add(i); }
+    for (let x = 1; x < W - 1; x++) water.add(RIVER_Y * W + x);
+    for (let y = 1; y < H - 1; y++) water.add(y * W + RIVER_X);
+    for (const x of BRIDGES) { const i = RIVER_Y * W + x; bridge.add(i); heads.add(i - W); heads.add(i + W); }
+    for (const y of VBRIDGES) { const i = y * W + RIVER_X; bridge.add(i); heads.add(i - 1); heads.add(i + 1); }
     return { water, bridge, heads };
   }
 
@@ -317,7 +320,7 @@ const SIM = (() => {
 
   // ---- river geysers: now and then the river shoots water at a player (or a few random cells).
   // Whoever it lands on is soaked and crawls along for 4 seconds.
-  const WET_TIME = 4, GEYSER_FLY = 1.3;
+  const WET_TIME = 4, GEYSER_FLY = 1.6;
   function geyserStep(g, dt) {
     g.geyT -= dt;
     if (g.geyT <= 0) {
@@ -326,11 +329,16 @@ const SIM = (() => {
       const floor = []; for (let i = 0; i < W * H; i++) if (isFloor(g.map[i])) floor.push(i);
       const alive = g.players.filter(p => p && p.st === 0);
       if (src.length && floor.length) {
-        const s = src[(Math.random() * src.length) | 0], targets = new Set();
+        const targets = new Set();
         if (alive.length && Math.random() < 0.6) { const p = alive[(Math.random() * alive.length) | 0]; targets.add(idx(Math.round(p.x), Math.round(p.y))); }
         else { const n = 2 + ((Math.random() * 2) | 0); for (let k = 0; k < n * 4 && targets.size < n; k++) targets.add(floor[(Math.random() * floor.length) | 0]); }
-        for (const t of targets) g.geysers.push({ s, t, k: 0 });
-        ev(g, 'geyser', -5, s);
+        for (const t of targets) { // the fish surfaces somewhere in the river not far from its target
+          const tx = t % W, ty = (t / W) | 0;
+          const near = src.map(i => [i, Math.hypot(i % W - tx, ((i / W) | 0) - ty)]).filter(([, d]) => d >= 1.5).sort((p, q) => p[1] - q[1]).slice(0, 6);
+          const s = (near.length ? near[(Math.random() * near.length) | 0][0] : src[(Math.random() * src.length) | 0]);
+          if (g.geysers.some(q => q.s === s)) continue;
+          g.geysers.push({ s, t, k: 0 }); ev(g, 'geyser', -5, s);
+        }
       }
     }
     for (let k = g.geysers.length - 1; k >= 0; k--) {
@@ -897,7 +905,7 @@ const AUTO = {
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
   giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
-  soak: (a, b) => [`${b} bị nước sông phun trúng, giờ đi chậm như rùa!`, `Ào! ${b} ướt sũng, 4 giây lết từng bước!`],
+  soak: (a, b) => [`Con cá phun nước trúng ${b}, giờ đi chậm như rùa!`, `Ào! ${b} ướt sũng vì cá phun, 4 giây lết từng bước!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],

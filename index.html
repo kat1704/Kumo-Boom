@@ -2317,6 +2317,7 @@ function handleEvent(e, S) {
     [600, 900, 1350].forEach((f, i) => tone(f, f * 1.5, 0.1, 'sine', 0.08, i * 0.05));
     spawnDebris(from % W, (from / W) | 0, '#d9b8ff', 12); spawnDebris(to % W, (to / W) | 0, '#fff6c8', 18);
     R.flashes.push({ x: to % W, y: (to / W) | 0, t: now, c: COLORS[e.a] || '#d9b8ff' });
+    gateLink(S, from, to, now);
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
@@ -2326,7 +2327,7 @@ function handleEvent(e, S) {
     [220, 330, 495, 990].forEach((f, k) => tone(f, f * 0.5, 0.18, 'sawtooth', 0.05, k * 0.06)); R.shake = Math.max(R.shake || 0, 0.25);
     addFeed('🌌 Một vết nứt không gian vừa mở! Hai cổng sáng cùng màu nối với nhau: người và bom đi qua được.', 'sys'); return;
   }
-  if (e.k === 'btele') { const to = e.b % 1000; spawnDebris(to % W, (to / W) | 0, '#00f0ff', 10); tone(500, 1200, 0.12, 'square', 0.05); return; }
+  if (e.k === 'btele') { const to = e.b % 1000; gateLink(S, Math.floor(e.b / 1000), to, now); spawnDebris(to % W, (to / W) | 0, '#00f0ff', 10); tone(500, 1200, 0.12, 'square', 0.05); return; }
   if (e.k === 'giantWake') { tone(120, 380, 0.35, 'sawtooth', 0.09); tone(600, 900, 0.15, 'square', 0.05, 0.25); addFeed(`⚡ ${e.a >= 0 ? seatName(S, e.a) + ' làm' : 'Bom làm'} Mây Khổng Lồ tỉnh giấc! Nó sắp giật sét 5 ô!`, 'sys'); return; }
   if (e.k === 'giantSleep') return;
   if (e.k === 'geyser') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#9fd8ff', 14); noise(0.5, 0.12, 1500); return; }
@@ -2537,6 +2538,7 @@ function drawBoard(S, dt, now) {
   }
   ctx.globalAlpha = 1;
   drawFlashes(now);
+  drawLinks(now);
   drawBolts(S, now);
   // name tags on top
   for (let s = 0; s < MAXP; s++) drawTag(S, s);
@@ -3131,6 +3133,41 @@ function drawBolts(S, now) {
       }
       ctx.restore();
     }
+  }
+}
+// lightning arcing from the gate someone went in to the gate (or spot) they came out of
+function gateLink(S, from, to, now) {
+  const c = S.m && S.m[from] === 'r' || R.base[from] === 'r' ? riftCol(S, from) : '#9fe8ff';
+  (R.links = R.links || []).push({ from, to, t: now, c, seed: Array.from({ length: 12 }, () => Math.random()) });
+}
+function drawLinks(now) {
+  if (!R.links || !R.links.length) return;
+  for (let k = R.links.length - 1; k >= 0; k--) {
+    const L = R.links[k], a = now - L.t, life = 0.6;
+    if (a > life || a < -0.1) { R.links.splice(k, 1); continue; }
+    const fade = 1 - Math.max(0, a) / life;
+    const top = i => { const x = i % W, y = (i / W) | 0; return [SX(x), SY(y) - (R.base[i] === 'r' ? T * 0.55 : T * 0.4)]; };
+    const [x0, y0] = top(L.from), [x1, y1] = top(L.to);
+    const dist = Math.hypot(x1 - x0, y1 - y0), n = Math.max(6, Math.min(16, Math.round(dist / (T * 0.5)))), lift = Math.min(T * 1.4, dist * 0.18);
+    const flick = Math.floor(now * 30) % 2; // re-jitter every other frame so it crackles
+    const pts = [];
+    for (let j = 0; j <= n; j++) {
+      const u = j / n, jit = (j === 0 || j === n) ? 0 : (((L.seed[j % 12] + flick * 0.37) % 1) - 0.5) * T * 0.6;
+      const bx = x0 + (x1 - x0) * u, by = y0 + (y1 - y0) * u - Math.sin(u * Math.PI) * lift;
+      const nx = -(y1 - y0) / (dist || 1), ny = (x1 - x0) / (dist || 1);
+      pts.push([bx + nx * jit, by + ny * jit]);
+    }
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+    for (const [lw, col, al] of [[Math.max(10, T * 0.28), L.c, 0.35], [Math.max(4, T * 0.1), L.c, 0.9], [Math.max(1.5, T * 0.04), '#ffffff', 1]]) {
+      ctx.globalAlpha = al * fade; ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+      pts.forEach(([px, py], j) => j ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke();
+    }
+    // a bright spark travelling along the bolt
+    const u = Math.min(1, Math.max(0, a) / 0.25), j = Math.min(n - 1, Math.floor(u * n)), f = u * n - j;
+    const sx = pts[j][0] + (pts[j + 1][0] - pts[j][0]) * f, sy = pts[j][1] + (pts[j + 1][1] - pts[j][1]) * f;
+    const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, T * 0.35); sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalAlpha = fade; ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, T * 0.35, 0, 7); ctx.fill();
+    ctx.restore();
   }
 }
 // bright burst where a portal drops someone off

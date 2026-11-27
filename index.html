@@ -2193,7 +2193,7 @@ const MAP_INFO = {
   classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng 2 con 🐝 ong bay lượn trên sân, thỉnh thoảng chui vào bụi rồi hiện ra chỗ khác: lại gần 2 ô là bị đuổi chích, choáng 2 giây.' },
   river: { name: '🌊 Bờ sông', theme: 'grass', desc: 'Sông chữ thập uốn lượn chia sân thành 4 khu, mỗi nhánh có 1 cây cầu. Thỉnh thoảng 🐟 cá nhô lên phun nước vào người chơi hoặc vài ô bất kỳ (vòng xanh là chỗ nước rơi): trúng nước là đi cực chậm 4 giây.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông. Giữa sân có 💤 Mây Khổng Lồ đang ngủ: tia nổ trúng nó là nó giật mình, giật sét 5 ô (ô vàng nhấp nháy), ai đứng trong ô là dính như trúng bom.' },
-  portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: 'Thành phố Cyberpunk với 4 cổng dịch chuyển (người bước vào bị đưa tới chỗ ngẫu nhiên). Càng về sau càng mở thêm 🌌 vết nứt không gian: hai vết cùng màu nối nhau, người đi qua lại được. Tia nổ chui vào cổng/vết nứt sẽ phun ra ở cổng bên kia, bom bị đá cũng trượt xuyên qua.' },
+  portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: 'Thành phố Cyberpunk với 4 cổng dịch chuyển (người bước vào bị đưa tới chỗ ngẫu nhiên). Càng về sau càng mở thêm 🌌 cổng sáng không gian: hai cổng cùng màu nối nhau, người đi qua lại được. Tia nổ chui vào cổng sẽ phun ra ở cổng bên kia, bom bị đá cũng trượt xuyên qua.' },
 };
 let curTheme = 'grass';
 function SIM_RNG(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
@@ -2324,7 +2324,7 @@ function handleEvent(e, S) {
     const a = Math.floor(e.b / 1000), b = e.b % 1000;
     for (const i of [a, b]) { spawnDebris(i % W, (i / W) | 0, '#ff2bd6', 14); R.flashes.push({ x: i % W, y: (i / W) | 0, t: now, c: '#00f0ff' }); }
     [220, 330, 495, 990].forEach((f, k) => tone(f, f * 0.5, 0.18, 'sawtooth', 0.05, k * 0.06)); R.shake = Math.max(R.shake || 0, 0.25);
-    addFeed('🌌 Một vết nứt không gian vừa mở! Hai vết cùng màu nối với nhau: người và bom đi qua được.', 'sys'); return;
+    addFeed('🌌 Một vết nứt không gian vừa mở! Hai cổng sáng cùng màu nối với nhau: người và bom đi qua được.', 'sys'); return;
   }
   if (e.k === 'btele') { const to = e.b % 1000; spawnDebris(to % W, (to / W) | 0, '#00f0ff', 10); tone(500, 1200, 0.12, 'square', 0.05); return; }
   if (e.k === 'giantWake') { tone(120, 380, 0.35, 'sawtooth', 0.09); tone(600, 900, 0.15, 'square', 0.05, 0.25); addFeed(`⚡ ${e.a >= 0 ? seatName(S, e.a) + ' làm' : 'Bom làm'} Mây Khổng Lồ tỉnh giấc! Nó sắp giật sét 5 ô!`, 'sys'); return; }
@@ -2502,6 +2502,7 @@ function drawBoard(S, dt, now) {
       else if (ITEM_ICON[c]) drawItem(c, x, y, now);
     }
     if (S.gi && y === S.gi[1] + S.gi[3] - 1) drawGiant(S.gi, now);
+    for (let x = 0; x < W; x++) if (R.base[y * W + x] === 'r') drawRiftGate(S, x, y, now, y * W + x);
     for (const b of bombRows[y] || []) drawBomb(b, now);
     const pb = R.pendingBomb;
     if (pb && (pb.cell / W | 0) === y) {
@@ -2646,19 +2647,41 @@ function drawBridge(x, y) {
 }
 // a space rift: a jagged tear in the floor, colour shared with its linked twin
 const RIFT_COLS = ['#ff2bd6', '#00f0ff', '#ffe600', '#7dff5a', '#ff7a2c', '#b388ff'];
+const riftCol = (S, i) => { const k = (S.rf || []).findIndex(r => r[0] === i || r[1] === i); return RIFT_COLS[(k < 0 ? 0 : k) % RIFT_COLS.length]; };
+// floor part of a rift gate: a glowing pad (drawn under everything)
 function drawRift(S, x, y, now, i) {
-  const k = (S.rf || []).findIndex(r => r[0] === i || r[1] === i), col = RIFT_COLS[(k < 0 ? 0 : k) % RIFT_COLS.length];
-  const cx = SX(x), cy = SY(y), seed = i * 7.31;
-  const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, T * 0.55); glow.addColorStop(0, col); glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.save(); ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now * 6 + seed); ctx.fillStyle = glow; ctx.beginPath(); ctx.ellipse(cx, cy, T * 0.55, TY * 0.5, 0, 0, 7); ctx.fill(); ctx.restore();
-  // the tear itself: a dark jagged slit with a bright rim
-  const pts = []; for (let s = 0; s <= 8; s++) { const u = s / 8, jit = (Math.sin(seed + s * 2.1 + Math.floor(now * 12) * 0.7) * 0.5) * T * 0.12; pts.push([cx + (u - 0.5) * T * 0.8 + jit * 0.3, cy + (u - 0.5) * TY * 0.5 + jit]); }
-  for (const [lw, c2] of [[Math.max(7, T * 0.2), col], [Math.max(3, T * 0.08), '#ffffff'], [Math.max(1.5, T * 0.035), '#05010f']]) {
-    ctx.strokeStyle = c2; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach(([px, py], s) => s ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke();
-  }
-  // glitch slivers
-  if (Math.floor(now * 9 + seed) % 3 === 0) { ctx.fillStyle = col; for (let s = 0; s < 3; s++) ctx.fillRect(cx + Math.sin(seed + s * 3 + now * 30) * T * 0.4, cy + (s - 1) * TY * 0.18, T * 0.18, 2); }
-  if (Math.random() < 0.12) R.particles.push({ x, y, z: 0.1, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.4, vz: 1.4 + Math.random(), life: 0.5, c: col, s: 0.04 });
+  const col = riftCol(S, i), cx = SX(x), cy = SY(y);
+  const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, T * 0.6); glow.addColorStop(0, col); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.save(); ctx.globalAlpha = 0.5 + 0.2 * Math.sin(now * 5 + i); ctx.fillStyle = glow; ctx.beginPath(); ctx.ellipse(cx, cy, T * 0.6, TY * 0.52, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(cx, cy + TY * 0.08, T * 0.42, TY * 0.3, 0, 0, 7); ctx.stroke();
+  ctx.restore();
+}
+// the standing gate itself: an upright ring of light with a swirling core, drawn with its row
+function drawRiftGate(S, x, y, now, i) {
+  const col = riftCol(S, i), cx = SX(x), base = SY(y) + TY * 0.08;
+  const rx = T * 0.36, ry = T * 0.52, cy = base - ry * 0.95;
+  ctx.save();
+  // outer halo
+  const halo = ctx.createRadialGradient(cx, cy, ry * 0.4, cx, cy, ry * 1.6); halo.addColorStop(0, col); halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = 0.45 + 0.15 * Math.sin(now * 4 + i); ctx.fillStyle = halo; ctx.beginPath(); ctx.ellipse(cx, cy, rx * 1.7, ry * 1.5, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  // swirling core
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.save(); ctx.clip();
+  const core = ctx.createRadialGradient(cx, cy, 1, cx, cy, ry); core.addColorStop(0, '#ffffff'); core.addColorStop(0.35, col); core.addColorStop(1, '#0a0420');
+  ctx.fillStyle = core; ctx.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = Math.max(1.5, T * 0.03);
+  for (let k = 0; k < 3; k++) { const a0 = now * 3 + k * 2.1; ctx.beginPath(); ctx.ellipse(cx, cy, rx * (0.3 + k * 0.22), ry * (0.3 + k * 0.22), 0, a0, a0 + 3.4); ctx.stroke(); }
+  ctx.restore();
+  // frame: thick neon ring with a bright inner line
+  ctx.shadowColor = col; ctx.shadowBlur = T * 0.35;
+  ctx.strokeStyle = col; ctx.lineWidth = Math.max(4, T * 0.1); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, T * 0.03); ctx.beginPath(); ctx.ellipse(cx, cy, rx * 0.93, ry * 0.95, 0, 0, 7); ctx.stroke();
+  // little feet so it stands on the floor
+  ctx.fillStyle = '#1d2540'; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + s * rx * 0.55, base - TY * 0.12); ctx.lineTo(cx + s * rx * 1.05, base); ctx.lineTo(cx + s * rx * 0.3, base); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  // sparks
+  if (Math.random() < 0.15) R.particles.push({ x: x + (Math.random() - 0.5) * 0.5, y, z: 0.6 + Math.random() * 0.6, vx: (Math.random() - 0.5) * 0.8, vy: 0, vz: 1 + Math.random(), life: 0.5, c: col, s: 0.04 });
+  ctx.restore();
 }
 function drawPortal(x, y, now, i) {
   const cx = SX(x), cy = SY(y), cols = ['#ff7ad9', '#7ad7ff', '#ffd36b', '#8dff8a'], col = cols[[[3, 3], [W - 4, 3], [3, H - 4], [W - 4, H - 4]].findIndex(([a, b]) => a === x && b === y)] || '#b48cff';

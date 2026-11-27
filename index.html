@@ -350,7 +350,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
   <div class="row" style="justify-content:space-between"><h3>🎙️ Bảng điều khiển Host</h3><button id="hpClose">✕</button></div>
   <div class="row">
     <span>Bản đồ:</span>
-    <select id="hpMap"><option value="random">🎲 Ngẫu nhiên mỗi ván</option><option value="classic">🌿 Đồng cỏ</option><option value="river">🌊 Sông ngã tư</option><option value="storm">⛈️ Đỉnh Mây Giông</option><option value="portal">🌀 Cổng không gian</option></select>
+    <select id="hpMap"><option value="random">🎲 Ngẫu nhiên mỗi ván</option><option value="classic">🌿 Đồng cỏ</option><option value="river">🌊 Bờ sông</option><option value="storm">⛈️ Đỉnh Mây Giông</option><option value="portal">🌀 Cổng không gian</option></select>
   </div>
   <div class="row">
     <span>Kích thước:</span>
@@ -465,7 +465,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Bờ sông (sông uốn lượn mỗi ván một kiểu, chỉ qua bằng cầu; sông thỉnh thoảng phun nước, trúng là đi cực chậm 4 giây) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Naruko (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -490,7 +490,7 @@ const SIM = (() => {
   const BOMB_TIME = 2.6, FLAME_TIME = 0.5, TRAP_TIME = 4.5, COUNT_TIME = 3, END_TIME = 5;
   const KICK_SPEED = 7, THROW_DIST = 3, KILL_PTS = 1, WIN_PTS = 2;
   const DIRS = [[0, 1], [0, -1], [-1, 0], [1, 0]]; // dir 0 down,1 up,2 left,3 right
-  const BASE_SPEED = 3.3, SPEED_STEP = 0.45, MAX_SPEED_LVL = 6, TRAP_SPEED = 0.7;
+  const BASE_SPEED = 3.3, SPEED_STEP = 0.45, MAX_SPEED_LVL = 6, TRAP_SPEED = 0.7, WET_SLOW = 0.3;
   const idx = (x, y) => y * W + x;
   const isFloor = c => c === '.' || c === 'g' || c === '=';
   const MAPS = ['classic', 'river', 'storm', 'portal'];
@@ -534,6 +534,60 @@ const SIM = (() => {
     return 't';
   }
 
+  // a river that winds across the map, different every game, with a few bridges over it
+  function genRiver(rand) {
+    const pillar = (x, y) => x % 2 === 0 && y % 2 === 0;
+    for (let tries = 0; tries < 80; tries++) {
+      const horiz = rand() < 0.5, L = horiz ? W : H, S = horiz ? H : W;
+      let o = Math.round((S - 1) / 2 + (rand() * 2 - 1) * Math.max(1, (S - 9) / 2)); // start near the middle, then wander
+      const cells = [];
+      for (let a = 1; a <= L - 2; a++) {
+        cells.push([a, o]);
+        if (a < L - 2 && rand() < 0.5) { // bend
+          const d = rand() < 0.5 ? -1 : 1, n = rand() < 0.35 ? 2 : 1;
+          for (let k = 0; k < n; k++) { const no = o + d; if (no < 2 || no > S - 3) break; o = no; cells.push([a, o]); }
+        }
+      }
+      const water = new Set(cells.map(([a, b]) => horiz ? b * W + a : a * W + b));
+      let ok = true;
+      for (const i of water) if (nearSpawn(i % W, (i / W) | 0)) { ok = false; break; }
+      if (!ok) continue;
+      // bridges: straight bits of river where you can step across
+      const wet = (x, y) => water.has(y * W + x);
+      const cand = [];
+      for (const i of water) {
+        const x = i % W, y = (i / W) | 0;
+        const across = horiz ? [[x, y - 1], [x, y + 1]] : [[x - 1, y], [x + 1, y]];
+        const along = horiz ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]];
+        if (across.some(([cx, cy]) => wet(cx, cy) || cx < 1 || cy < 1 || cx > W - 2 || cy > H - 2)) continue;
+        if (!along.every(([cx, cy]) => wet(cx, cy) || cx < 1 || cy < 1 || cx > W - 2 || cy > H - 2)) continue;
+        cand.push({ i, a: horiz ? x : y, heads: across.map(([cx, cy]) => cy * W + cx) });
+      }
+      const nb = L >= 19 ? 3 : 2;
+      if (cand.length < nb) continue;
+      cand.sort((p, q) => p.a - q.a);
+      const bridge = new Set(), heads = new Set();
+      for (let k = 0; k < nb; k++) { // one bridge in each stretch of the river
+        const lo = Math.floor(cand.length * k / nb), hi = Math.max(lo + 1, Math.floor(cand.length * (k + 1) / nb));
+        const pool = cand.slice(lo, hi).filter(c => [...bridge].every(b => Math.abs((b % W) - (c.i % W)) + Math.abs(((b / W) | 0) - ((c.i / W) | 0)) >= 4));
+        if (!pool.length) continue;
+        const c = pool[Math.floor(rand() * pool.length)];
+        bridge.add(c.i); for (const h of c.heads) heads.add(h);
+      }
+      if (bridge.size < 2) continue;
+      // everyone must be able to reach everyone (crates can be blasted, pillars and water cannot)
+      const blocked = i => { const x = i % W, y = (i / W) | 0; if (x < 1 || y < 1 || x > W - 2 || y > H - 2) return true; if (bridge.has(i) || heads.has(i)) return false; if (water.has(i)) return true; return pillar(x, y); };
+      const seen = new Set([SPAWNS[0][1] * W + SPAWNS[0][0]]), q = [...seen];
+      while (q.length) { const i = q.pop(); for (const d of [1, -1, W, -W]) { const j = i + d; if (!seen.has(j) && !blocked(j)) { seen.add(j); q.push(j); } } }
+      if (!SPAWNS.every(([x, y]) => seen.has(y * W + x))) continue;
+      return { water, bridge, heads };
+    }
+    // fallback: the old straight river
+    const water = new Set(), bridge = new Set(), heads = new Set();
+    for (let x = 1; x < W - 1; x++) { const i = RIVER_Y * W + x; if (BRIDGES.includes(x)) { bridge.add(i); heads.add(i - W); heads.add(i + W); } else water.add(i); }
+    return { water, bridge, heads };
+  }
+
   function nearSpawn(x, y) {
     for (const [sx, sy] of SPAWNS) if (Math.abs(sx - x) + Math.abs(sy - y) <= 1) return true;
     return false;
@@ -546,17 +600,18 @@ const SIM = (() => {
     const mapId = MAPS.includes(cfg.map) ? cfg.map : 'classic';
     const map = new Array(W * H).fill('.');
     const hid = new Array(W * H).fill(null);
+    const river = mapId === 'river' ? genRiver(rand) : null;
     const isPortal = (x, y) => mapId === 'portal' && PORTALS.some(([px, py]) => px === x && py === y);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = idx(x, y);
       if (x === 0 || y === 0 || x === W - 1 || y === H - 1) map[i] = '#';
       else if (mapId === 'storm' && x >= (W - 1) / 2 - 1 && x <= (W - 1) / 2 + 1 && y >= (H - 1) / 2 - 1 && y <= (H - 1) / 2 - (H % 4 === 1 ? 0 : 0)) map[i] = 'C';
-      else if (mapId === 'river' && y === RIVER_Y) map[i] = BRIDGES.includes(x) ? '=' : '~';
-      else if (mapId === 'river' && x === RIVER_X) map[i] = VBRIDGES.includes(y) ? '=' : '~';
+      else if (river && river.bridge.has(i)) map[i] = '=';
+      else if (river && river.water.has(i)) map[i] = '~';
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';
-      else if (mapId === 'river' && ((BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) || (VBRIDGES.includes(y) && Math.abs(x - RIVER_X) === 1))) map[i] = '.'; // bridge heads stay open
+      else if (river && river.heads.has(i)) map[i] = '.'; // bridge heads stay open
       else {
         const r = rand(), crate = mapId === 'classic' ? 0.5 : 0.62, grass = mapId === 'classic' ? 0.88 : 0.75; // the meadow is thick with bushes
         if (r < crate) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < grass) map[i] = 'g';
@@ -571,7 +626,7 @@ const SIM = (() => {
         seat: s, name: pc.name, bot: !!pc.bot,
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
-        st: 0, trapT: 0, inv: 0, moving: 0, stun: 0,
+        st: 0, trapT: 0, inv: 0, moving: 0, stun: 0, wet: 0,
         maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
@@ -579,7 +634,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, geysers: [], geyT: 6 + rand() * 3,
       giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
@@ -673,7 +728,7 @@ const SIM = (() => {
 
   function movePlayer(g, p, dx, dy, dt) {
     if (!dx && !dy) { p.moving = 0; return; }
-    const speed = p.st === 1 ? TRAP_SPEED : BASE_SPEED + effSpd(p) * SPEED_STEP;
+    const speed = (p.st === 1 ? TRAP_SPEED : BASE_SPEED + effSpd(p) * SPEED_STEP) * (p.wet > 0 ? WET_SLOW : 1);
     let dist = speed * dt;
     if (dx && dy) { // prefer an open axis
       const rc = Math.round(p.y), cc = Math.round(p.x);
@@ -742,6 +797,34 @@ const SIM = (() => {
     const to = pool[(g.rand() * pool.length) | 0];
     p.x = to % W; p.y = (to / W) | 0; p.ghost.clear(); p.tpCd = 1.2;
     ev(g, 'tele', p.seat, from * 1000 + to);
+  }
+
+  // ---- river geysers: now and then the river shoots water at a player (or a few random cells).
+  // Whoever it lands on is soaked and crawls along for 4 seconds.
+  const WET_TIME = 4, GEYSER_FLY = 1.3;
+  function geyserStep(g, dt) {
+    g.geyT -= dt;
+    if (g.geyT <= 0) {
+      g.geyT = 5 + Math.random() * 4;
+      const src = []; for (let i = 0; i < W * H; i++) if (g.map[i] === '~') src.push(i);
+      const floor = []; for (let i = 0; i < W * H; i++) if (isFloor(g.map[i])) floor.push(i);
+      const alive = g.players.filter(p => p && p.st === 0);
+      if (src.length && floor.length) {
+        const s = src[(Math.random() * src.length) | 0], targets = new Set();
+        if (alive.length && Math.random() < 0.6) { const p = alive[(Math.random() * alive.length) | 0]; targets.add(idx(Math.round(p.x), Math.round(p.y))); }
+        else { const n = 2 + ((Math.random() * 2) | 0); for (let k = 0; k < n * 4 && targets.size < n; k++) targets.add(floor[(Math.random() * floor.length) | 0]); }
+        for (const t of targets) g.geysers.push({ s, t, k: 0 });
+        ev(g, 'geyser', -5, s);
+      }
+    }
+    for (let k = g.geysers.length - 1; k >= 0; k--) {
+      const q = g.geysers[k]; q.k += dt;
+      if (q.k < GEYSER_FLY) continue;
+      g.geysers.splice(k, 1);
+      const tx = q.t % W, ty = (q.t / W) | 0;
+      ev(g, 'splash', -5, q.t);
+      for (const p of g.players) if (p && p.st === 0 && Math.abs(p.x - tx) < 0.75 && Math.abs(p.y - ty) < 0.75) { p.wet = WET_TIME; ev(g, 'soak', -5, p.seat); }
+    }
   }
 
   // ---- bees of the meadow: 2 bees roam the map in plain sight, now and then dive into a bush and pop out
@@ -1006,6 +1089,7 @@ const SIM = (() => {
         }
       }
       p.sinceAcc = (p.sinceAcc || 0) + dt; if (p.lockT > 0) p.lockT -= dt;
+      if (p.wet > 0) { p.wet -= dt; if (p.wet <= 0) p.wet = 0; }
       if (p.stun > 0) { p.stun -= dt; p.moving = 0; if (p.stun <= 0) p.stun = 0; continue; } // dazed by a bee: no moving, no bombs
       if (!(inp.pos && p.st === 0 && acceptPos(g, p, inp))) movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
       if (inp.bomb) placeBomb(g, p, inp.cell);
@@ -1018,6 +1102,7 @@ const SIM = (() => {
     for (const n of g.npcs) npcStep(g, n, dt);
     giantStep(g, dt);
     if (g.mapId === 'classic') beesStep(g, dt);
+    if (g.mapId === 'river') geyserStep(g, dt);
     for (let k = g.flyItems.length - 1; k >= 0; k--) {
       const f = g.flyItems[k]; f.t += dt;
       const u = Math.min(1, f.t / f.dur);
@@ -1259,8 +1344,9 @@ const SIM = (() => {
     }
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
-      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
+      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10), Math.ceil((p.wet || 0) * 10)] : 0),
       gi: g.giant ? [g.giant.x0, g.giant.y0, g.giant.w, g.giant.h, g.giant.st, Math.round(g.giant.t * 10), g.giant.warn] : 0,
+      gy: (g.geysers || []).map(q => [q.s, q.t, Math.round(q.k / GEYSER_FLY * 100)]),
       be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
@@ -1998,7 +2084,7 @@ const THEMES = {
 };
 const MAP_INFO = {
   classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng 2 con 🐝 ong bay lượn trên sân, thỉnh thoảng chui vào bụi rồi hiện ra chỗ khác: lại gần 2 ô là bị đuổi chích, choáng 2 giây.' },
-  river: { name: '🌊 Sông ngã tư', theme: 'grass', desc: 'Sông chữ thập chia sân thành 4 vùng, mỗi nhánh sông chỉ có 1 cây cầu. Tia nước và bom ném bay qua sông được, người thì không.' },
+  river: { name: '🌊 Bờ sông', theme: 'grass', desc: 'Dòng sông uốn lượn mỗi ván một kiểu, chỉ qua được bằng cầu. Thỉnh thoảng sông 💦 phun nước lên đầu người chơi hoặc vài ô bất kỳ (vòng xanh là chỗ nước rơi): trúng nước là đi cực chậm 4 giây.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông. Giữa sân có 💤 Mây Khổng Lồ đang ngủ: tia nổ trúng nó là nó giật mình, giật sét 5 ô (ô vàng nhấp nháy), ai đứng trong ô là dính như trúng bom.' },
   portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
 };
@@ -2129,6 +2215,9 @@ function handleEvent(e, S) {
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
   if (e.k === 'giantWake') { tone(120, 380, 0.35, 'sawtooth', 0.09); tone(600, 900, 0.15, 'square', 0.05, 0.25); addFeed(`⚡ ${e.a >= 0 ? seatName(S, e.a) + ' làm' : 'Bom làm'} Mây Khổng Lồ tỉnh giấc! Nó sắp giật sét 5 ô!`, 'sys'); return; }
   if (e.k === 'giantSleep') return;
+  if (e.k === 'geyser') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#9fd8ff', 14); noise(0.5, 0.12, 1500); return; }
+  if (e.k === 'splash') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#7cc8ff', 16); noise(0.25, 0.15, 2500); R.flashes.push({ x: i % W, y: (i / W) | 0, t: now, c: '#5cb8ff', water: 1 }); return; }
+  if (e.k === 'soak') { tone(700, 200, 0.4, 'sine', 0.08); addFeed(`💦 ${seatName(S, e.b)} bị sông phun nước trúng, đi chậm rì 4 giây!`, 'sys'); return; }
   if (e.k === 'bolt') {
     const cells = String(e.b).split('.').map(Number).filter(n => n >= 0);
     R.bolts = R.bolts || []; R.bolts.push({ t: now, cells, seed: Array.from({ length: 8 }, () => Math.random()) });
@@ -2181,7 +2270,7 @@ function predictStep(S, dt) {
   if (!PRED.on) { PRED.p = null; PRED.seat = -1; return; }
   const sp = S.p[ms]; if (!sp) { PRED.on = false; return; }
   const sx = sp[0] / 100, sy = sp[1] / 100;
-  if (!PRED.p || PRED.seat !== ms || sp[2] !== 0 || sp[16] > 0) { PRED.p = { x: sx, y: sy, dir: sp[3], st: 0, spd: sp[6], pw: 0, kick: 0, ghost: new Set(), moving: 0 }; PRED.seat = ms; if (sp[2] !== 0 || sp[16] > 0) return; }
+  if (!PRED.p || PRED.seat !== ms || sp[2] !== 0 || sp[16] > 0 || sp[17] > 0) { PRED.p = { x: sx, y: sy, dir: sp[3], st: 0, spd: sp[6], pw: 0, kick: 0, ghost: new Set(), moving: 0 }; PRED.seat = ms; if (sp[2] !== 0 || sp[16] > 0 || sp[17] > 0) return; }
   const P = PRED.p; P.spd = sp[6];
   SIM.useDims(W, H);
   // world built from the latest snapshot
@@ -2321,6 +2410,7 @@ function drawBoard(S, dt, now) {
   }
   drawNpc(S, now);
   drawBees(S, now, dt);
+  drawGeysers(S, now);
   // particles
   for (let k = R.particles.length - 1; k >= 0; k--) {
     const q = R.particles[k]; q.life -= dt;
@@ -2387,7 +2477,7 @@ function drawWater(x, y, now) {
   }
 }
 function drawBridge(x, y) {
-  if (R.base[y * W + x - 1] === '~' && R.base[y * W + x + 1] === '~') { // crossing a north-south arm: planks run east-west
+  if (isWet(x, y - 1) && isWet(x, y + 1) && !(isWet(x - 1, y) && isWet(x + 1, y))) { // crossing a north-south stretch: planks run east-west
     const x0 = SX(x) - T * 0.62, y0 = SY(y) - TY * 0.42, w = T * 1.24, h = TY * 0.84;
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x0 + 3, y0 + 4, w, h);
     ctx.fillStyle = '#b5793c'; ctx.fillRect(x0, y0, w, h);
@@ -2448,6 +2538,38 @@ function drawBees(S, now, dt) {
     ctx.restore();
   }
   for (const id of [...beeDisp.keys()]) if (!live.has(id)) beeDisp.delete(id);
+}
+// water shot up from the river: a spout at the source, a blob flying in an arc, a ring where it will land
+function drawGeysers(S, now) {
+  for (const q of S.gy || []) {
+    const s = q[0], t = q[1], u = q[2] / 100;
+    const sx = s % W, sy = (s / W) | 0, tx = t % W, ty = (t / W) | 0;
+    const pulse = 0.5 + 0.5 * Math.sin(now * 16);
+    ctx.fillStyle = `rgba(80,180,255,${0.15 + pulse * 0.2})`; ctx.beginPath(); ctx.ellipse(SX(tx), SY(ty), T * 0.46, TY * 0.42, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(120,210,255,${0.6 + pulse * 0.4})`; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+    if (u < 0.3) { // spout
+      const h = T * 2.2 * Math.sin(u / 0.3 * Math.PI), cx = SX(sx), cy = SY(sy);
+      const gr = ctx.createLinearGradient(0, cy - h, 0, cy); gr.addColorStop(0, 'rgba(220,245,255,.95)'); gr.addColorStop(1, 'rgba(60,160,240,.8)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(cx - T * 0.22, cy); ctx.quadraticCurveTo(cx - T * 0.1, cy - h * 0.6, cx, cy - h); ctx.quadraticCurveTo(cx + T * 0.1, cy - h * 0.6, cx + T * 0.22, cy); ctx.fill();
+    }
+    const x = sx + (tx - sx) * u, y = sy + (ty - sy) * u, z = 4 * u * (1 - u) * 2.6;
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(SX(x), SY(y), T * 0.2, TY * 0.12, 0, 0, 7); ctx.fill();
+    const bx = SX(x), by = SY(y) - HZ * (0.4 + z), br = Math.max(5, T * 0.2);
+    const bg = ctx.createRadialGradient(bx - br * 0.3, by - br * 0.3, 1, bx, by, br); bg.addColorStop(0, '#f2fbff'); bg.addColorStop(0.5, '#7cc8ff'); bg.addColorStop(1, '#2a86d8');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.moveTo(bx, by - br * 1.5); ctx.quadraticCurveTo(bx + br, by - br * 0.2, bx, by + br); ctx.quadraticCurveTo(bx - br, by - br * 0.2, bx, by - br * 1.5); ctx.fill();
+    ctx.strokeStyle = '#1b5fa0'; ctx.lineWidth = 1.5; ctx.stroke();
+    for (let k = 1; k <= 3; k++) { const uu = Math.max(0, u - k * 0.04), xx = sx + (tx - sx) * uu, yy = sy + (ty - sy) * uu, zz = 4 * uu * (1 - uu) * 2.6; ctx.fillStyle = `rgba(150,215,255,${0.7 - k * 0.18})`; ctx.beginPath(); ctx.arc(SX(xx), SY(yy) - HZ * (0.4 + zz), br * (0.5 - k * 0.1), 0, 7); ctx.fill(); }
+  }
+}
+// a soaked player: drips and a little puddle
+function drawSoaked(cx, gy, top, now) {
+  ctx.fillStyle = 'rgba(70,160,240,.35)'; ctx.beginPath(); ctx.ellipse(cx, gy + TY * 0.15, T * 0.4, TY * 0.2, 0, 0, 7); ctx.fill();
+  for (let k = 0; k < 4; k++) {
+    const ph = (now * 1.6 + k / 4) % 1, x = cx + (k - 1.5) * T * 0.16, y = top + ph * (gy - top) * 0.9, r = Math.max(2, T * 0.05);
+    ctx.globalAlpha = 1 - ph * 0.6; ctx.fillStyle = '#5cb8ff';
+    ctx.beginPath(); ctx.moveTo(x, y - r * 2); ctx.quadraticCurveTo(x + r, y, x, y + r); ctx.quadraticCurveTo(x - r, y, x, y - r * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 // dizzy stars over a stung player
 function drawDazed(cx, y, now, t) {
@@ -2798,6 +2920,11 @@ function drawFlashes(now) {
     const f = R.flashes[k], a = now - f.t, L = 0.7;
     if (a > L || a < -0.1) { R.flashes.splice(k, 1); continue; }
     const u = Math.max(0, a) / L, cx = SX(f.x), cy = SY(f.y), fade = 1 - u;
+    if (f.water) { // splash ring
+      ctx.save(); ctx.globalAlpha = fade; ctx.strokeStyle = '#bfe6ff'; ctx.lineWidth = Math.max(2, T * 0.07);
+      for (const m of [1, 0.6]) { ctx.beginPath(); ctx.ellipse(cx, cy, T * (0.25 + u * 0.8) * m, TY * (0.15 + u * 0.5) * m, 0, 0, 7); ctx.stroke(); }
+      ctx.restore(); continue;
+    }
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // light pillar
     const pw = T * (0.55 - 0.3 * u), ph = T * 2.6;
@@ -2845,6 +2972,7 @@ function drawTag(S, s) {
   ctx.save(); ctx.globalAlpha = me ? 1 : Math.max(0.75, vis);
   const cx = SX(d.x), y = SY(d.y) - (p[2] === 1 ? 0.35 * HZ : 0) - T * 1.25 - 4;
   if (p[16] > 0) drawDazed(cx, y + T * 0.32, performance.now() / 1000, p[16] / 10);
+  if (p[17] > 0) drawSoaked(cx, SY(d.y), y + T * 0.4, performance.now() / 1000);
   if (me) drawMeArrow(cx, y - Math.max(14, T * 0.34) - 2, performance.now() / 1000);
   ctx.font = `800 ${Math.max(12, Math.round(T * 0.3))}px "Baloo 2",sans-serif`;
   const label = (me ? '★ ' + name : name) + (p[15] > 0 ? ` ⚡${Math.ceil(p[15] / 10)}s` : '');
@@ -3450,6 +3578,7 @@ const AUTO = {
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
   giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
+  soak: (a, b) => [`${b} bị nước sông phun trúng, giờ đi chậm như rùa!`, `Ào! ${b} ướt sũng, 4 giây lết từng bước!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],

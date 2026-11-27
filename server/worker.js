@@ -66,6 +66,7 @@ const SIM = (() => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = idx(x, y);
       if (x === 0 || y === 0 || x === W - 1 || y === H - 1) map[i] = '#';
+      else if (mapId === 'storm' && x >= (W - 1) / 2 - 1 && x <= (W - 1) / 2 + 1 && y >= (H - 1) / 2 - 1 && y <= (H - 1) / 2 - (H % 4 === 1 ? 0 : 0)) map[i] = 'C';
       else if (mapId === 'river' && y === RIVER_Y) map[i] = BRIDGES.includes(x) ? '=' : '~';
       else if (mapId === 'river' && x === RIVER_X) map[i] = VBRIDGES.includes(y) ? '=' : '~';
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
@@ -95,6 +96,7 @@ const SIM = (() => {
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
       npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0,
+      giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
@@ -120,7 +122,7 @@ const SIM = (() => {
   function passable(g, p, cx, cy) {
     if (cx < 0 || cy < 0 || cx >= W || cy >= H) return false;
     const i = idx(cx, cy), c = g.map[i];
-    if (c === '#' || c === 'x' || c === '~') return false;
+    if (c === '#' || c === 'x' || c === '~' || c === 'C') return false;
     const b = g.bombAt[i];
     if (b && !(p && p.ghost.has(b.id))) return false;
     return true;
@@ -169,7 +171,7 @@ const SIM = (() => {
   function acceptPos(g, p, inp) {
     const x = +inp.pos.x, y = +inp.pos.y;
     if (!isFinite(x) || !isFinite(y) || x < 0.5 || y < 0.5 || x > W - 1.5 || y > H - 1.5) return false;
-    const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~'; };
+    const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~' || c === 'C'; };
     if (p.lockT > 0) return false; // we just moved them (teleport): wait for their client to follow
     // how far could they have gone since the last report we took? (network hiccups bunch updates up)
     const speed = BASE_SPEED + MAX_SPEED_LVL * SPEED_STEP;
@@ -205,7 +207,7 @@ const SIM = (() => {
   function passableForBomb(g, b, cx, cy) {
     if (cx < 0 || cy < 0 || cx >= W || cy >= H) return false;
     const i = idx(cx, cy), c = g.map[i];
-    if (c === '#' || c === 'x' || c === '~' || c === 'o') return false;
+    if (c === '#' || c === 'x' || c === '~' || c === 'o' || c === 'C') return false;
     if (g.bombAt[i] && g.bombAt[i] !== b) return false;
     for (const q of g.players) if (q && q.st !== 2 && Math.round(q.x) === cx && Math.round(q.y) === cy) return false;
     return true;
@@ -383,12 +385,13 @@ const SIM = (() => {
     return true;
   }
 
-  function blastCells(g, bx, by, fire) {
+  function blastCells(g, bx, by, fire, hit) {
     const out = [[bx, by]];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       for (let k = 1; k <= fire; k++) {
         const x = bx + dx * k, y = by + dy * k;
         const c = g.map[idx(x, y)];
+        if (c === 'C') { if (hit) hit.giant = true; break; }
         if (c === '#') break;
         out.push([x, y]);
         if (c === 'x') break;
@@ -401,7 +404,8 @@ const SIM = (() => {
     g.bombs.splice(g.bombs.indexOf(b), 1);
     if (g.bombAt[idx(b.x, b.y)] === b) g.bombAt[idx(b.x, b.y)] = null;
     for (const p of g.players) if (p) p.ghost.delete(b.id);
-        for (const [x, y] of blastCells(g, b.x, b.y, b.fire)) {
+    const hit = { giant: false };
+    for (const [x, y] of blastCells(g, b.x, b.y, b.fire, hit)) {
       const i = idx(x, y);
       if (g.map[i] === 'x') { g.map[i] = '.'; g.drops[i] = g.hid[i]; g.hid[i] = null; }
       if (g.items[i] && !g.drops[i]) g.items[i] = null;
@@ -410,6 +414,43 @@ const SIM = (() => {
       if (ob && ob !== b) ob.t = Math.min(ob.t, 0.05);
       for (const mb of g.bombs) if (mb !== b && !mb.air && mb.x === x && mb.y === y) mb.t = Math.min(mb.t, 0.05);
     }
+    if (hit.giant) wakeGiant(g, b.o);
+  }
+
+  // ---- the giant storm cloud asleep in the middle of the storm map. A blast that hits it wakes it up:
+  // it marks 5 cells, then lightning strikes them (works like a bomb blast), and it falls asleep again.
+  const GIANT_WARN = 1.1, GIANT_AWAKE = 2.4, GIANT_NAP = 3, GIANT_BOLTS = 5;
+  function wakeGiant(g, by) {
+    const G = g.giant; if (!G || G.st !== 0 || G.cd > 0) return;
+    const free = i => isFloor(g.map[i]) && !g.bombAt[i];
+    const all = []; for (let i = 0; i < W * H; i++) if (free(i)) all.push(i);
+    const alive = g.players.filter(p => p && p.st === 0), pick = new Set();
+    for (let k = 0; k < GIANT_BOLTS * 6 && pick.size < GIANT_BOLTS && all.length; k++) {
+      let i;
+      if (alive.length && g.rand() < 0.5) { // half the bolts land around someone
+        const p = alive[(g.rand() * alive.length) | 0], x = Math.round(p.x) + ((g.rand() * 3) | 0) - 1, y = Math.round(p.y) + ((g.rand() * 3) | 0) - 1;
+        if (x < 1 || y < 1 || x > W - 2 || y > H - 2 || !free(idx(x, y))) continue;
+        i = idx(x, y);
+      } else i = all[(g.rand() * all.length) | 0];
+      pick.add(i);
+    }
+    G.st = 1; G.t = 0; G.warn = [...pick]; G.by = by;
+    ev(g, 'giantWake', by, -1);
+  }
+  function giantStep(g, dt) {
+    const G = g.giant; if (!G) return;
+    if (G.st === 0) { if (G.cd > 0) G.cd -= dt; return; }
+    const t0 = G.t; G.t += dt;
+    if (t0 < GIANT_WARN && G.t >= GIANT_WARN) {
+      for (const i of G.warn) {
+        if (g.map[i] === 'x') { g.map[i] = '.'; g.drops[i] = g.hid[i]; g.hid[i] = null; }
+        if (g.items[i] && !g.drops[i]) g.items[i] = null;
+        g.flames[i] = FLAME_TIME; g.flameOwner[i] = -4;
+        const ob = g.bombAt[i]; if (ob) ob.t = Math.min(ob.t, 0.05);
+      }
+      ev(g, 'bolt', -4, G.warn.join('.'));
+    }
+    if (G.t >= GIANT_AWAKE) { G.st = 0; G.t = 0; G.warn = []; G.cd = GIANT_NAP; ev(g, 'giantSleep', -4, -1); }
   }
 
   function placeBomb(g, p, want) {
@@ -437,7 +478,7 @@ const SIM = (() => {
     while (g.sd.acc >= SUDDEN_STEP && g.sd.k < SPIRAL.length) {
       g.sd.acc -= SUDDEN_STEP;
       const i = SPIRAL[g.sd.k++];
-      if (g.map[i] === '#') continue;
+      if (g.map[i] === '#' || g.map[i] === 'C') continue;
       g.map[i] = '#'; g.items[i] = null; g.hid[i] = null; g.drops[i] = null; g.flames[i] = 0;
       const b = g.bombAt[i];
       if (b) { g.bombs.splice(g.bombs.indexOf(b), 1); g.bombAt[i] = null; }
@@ -491,6 +532,7 @@ const SIM = (() => {
     }
 
     for (const n of g.npcs) npcStep(g, n, dt);
+    giantStep(g, dt);
     if (g.mapId === 'classic') beesStep(g, dt);
     for (let k = g.flyItems.length - 1; k >= 0; k--) {
       const f = g.flyItems[k]; f.t += dt;
@@ -591,6 +633,7 @@ const SIM = (() => {
         for (const [xx, yy] of blastCells(g, x, y, b.fire)) { const i = idx(xx, yy); if (tb < D[i]) D[i] = tb; }
       }
     }
+    if (g.giant && g.giant.st === 1 && g.giant.t < GIANT_WARN) for (const i of g.giant.warn) D[i] = Math.min(D[i], GIANT_WARN - g.giant.t);
     if (g.sd) for (let j = 0; j < 10 && g.sd.k + j < SPIRAL.length; j++) {
       const i = SPIRAL[g.sd.k + j], tt = (j + 1) * SUDDEN_STEP - g.sd.acc;
       if (tt < D[i]) D[i] = Math.max(0, tt);
@@ -733,6 +776,7 @@ const SIM = (() => {
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
       p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
+      gi: g.giant ? [g.giant.x0, g.giant.y0, g.giant.w, g.giant.h, g.giant.st, Math.round(g.giant.t * 10), g.giant.warn] : 0,
       be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
@@ -766,6 +810,7 @@ const AUTO = {
   rescue: (a, b) => [`${a} giải cứu đồng đội ${b} quá kịp thời!`, `Tinh thần đồng đội! ${a} cứu ${b}!`],
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
+  giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],
@@ -914,7 +959,7 @@ class RoomHost {
     if (this.cmQueue.length && Date.now() - this.cmLast > 2600) this.comment(this.cmQueue.shift());
     return snap;
   }
-  seatName(S, s) { if (s === -2) return 'Ông Mây Giông'; const st = S?.s?.[s]; return st ? (st[1] || 'Ghế ' + (s + 1)) : 'Ghế ' + (s + 1); }
+  seatName(S, s) { if (s === -2) return 'Ông Mây Giông'; if (s === -4) return 'Mây Khổng Lồ'; const st = S?.s?.[s]; return st ? (st[1] || 'Ghế ' + (s + 1)) : 'Ghế ' + (s + 1); }
   autoComment(e, S) {
     const f = AUTO[e.k]; let line = null;
     if (e.k === 'item' && e.b === 'p') line = `${this.seatName(S, e.a)} nhặt được Phách thần! Bom, tốc độ, tia nổ đều tối đa trong 10 giây!`;

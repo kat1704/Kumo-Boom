@@ -465,7 +465,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Phách thần (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -550,6 +550,7 @@ const SIM = (() => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = idx(x, y);
       if (x === 0 || y === 0 || x === W - 1 || y === H - 1) map[i] = '#';
+      else if (mapId === 'storm' && x >= (W - 1) / 2 - 1 && x <= (W - 1) / 2 + 1 && y >= (H - 1) / 2 - 1 && y <= (H - 1) / 2 - (H % 4 === 1 ? 0 : 0)) map[i] = 'C';
       else if (mapId === 'river' && y === RIVER_Y) map[i] = BRIDGES.includes(x) ? '=' : '~';
       else if (mapId === 'river' && x === RIVER_X) map[i] = VBRIDGES.includes(y) ? '=' : '~';
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
@@ -579,6 +580,7 @@ const SIM = (() => {
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
       npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0,
+      giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
@@ -604,7 +606,7 @@ const SIM = (() => {
   function passable(g, p, cx, cy) {
     if (cx < 0 || cy < 0 || cx >= W || cy >= H) return false;
     const i = idx(cx, cy), c = g.map[i];
-    if (c === '#' || c === 'x' || c === '~') return false;
+    if (c === '#' || c === 'x' || c === '~' || c === 'C') return false;
     const b = g.bombAt[i];
     if (b && !(p && p.ghost.has(b.id))) return false;
     return true;
@@ -653,7 +655,7 @@ const SIM = (() => {
   function acceptPos(g, p, inp) {
     const x = +inp.pos.x, y = +inp.pos.y;
     if (!isFinite(x) || !isFinite(y) || x < 0.5 || y < 0.5 || x > W - 1.5 || y > H - 1.5) return false;
-    const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~'; };
+    const blocked = (cx, cy) => { const c = g.map[idx(cx, cy)]; return c === '#' || c === 'x' || c === '~' || c === 'C'; };
     if (p.lockT > 0) return false; // we just moved them (teleport): wait for their client to follow
     // how far could they have gone since the last report we took? (network hiccups bunch updates up)
     const speed = BASE_SPEED + MAX_SPEED_LVL * SPEED_STEP;
@@ -689,7 +691,7 @@ const SIM = (() => {
   function passableForBomb(g, b, cx, cy) {
     if (cx < 0 || cy < 0 || cx >= W || cy >= H) return false;
     const i = idx(cx, cy), c = g.map[i];
-    if (c === '#' || c === 'x' || c === '~' || c === 'o') return false;
+    if (c === '#' || c === 'x' || c === '~' || c === 'o' || c === 'C') return false;
     if (g.bombAt[i] && g.bombAt[i] !== b) return false;
     for (const q of g.players) if (q && q.st !== 2 && Math.round(q.x) === cx && Math.round(q.y) === cy) return false;
     return true;
@@ -867,12 +869,13 @@ const SIM = (() => {
     return true;
   }
 
-  function blastCells(g, bx, by, fire) {
+  function blastCells(g, bx, by, fire, hit) {
     const out = [[bx, by]];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       for (let k = 1; k <= fire; k++) {
         const x = bx + dx * k, y = by + dy * k;
         const c = g.map[idx(x, y)];
+        if (c === 'C') { if (hit) hit.giant = true; break; }
         if (c === '#') break;
         out.push([x, y]);
         if (c === 'x') break;
@@ -885,7 +888,8 @@ const SIM = (() => {
     g.bombs.splice(g.bombs.indexOf(b), 1);
     if (g.bombAt[idx(b.x, b.y)] === b) g.bombAt[idx(b.x, b.y)] = null;
     for (const p of g.players) if (p) p.ghost.delete(b.id);
-        for (const [x, y] of blastCells(g, b.x, b.y, b.fire)) {
+    const hit = { giant: false };
+    for (const [x, y] of blastCells(g, b.x, b.y, b.fire, hit)) {
       const i = idx(x, y);
       if (g.map[i] === 'x') { g.map[i] = '.'; g.drops[i] = g.hid[i]; g.hid[i] = null; }
       if (g.items[i] && !g.drops[i]) g.items[i] = null;
@@ -894,6 +898,43 @@ const SIM = (() => {
       if (ob && ob !== b) ob.t = Math.min(ob.t, 0.05);
       for (const mb of g.bombs) if (mb !== b && !mb.air && mb.x === x && mb.y === y) mb.t = Math.min(mb.t, 0.05);
     }
+    if (hit.giant) wakeGiant(g, b.o);
+  }
+
+  // ---- the giant storm cloud asleep in the middle of the storm map. A blast that hits it wakes it up:
+  // it marks 5 cells, then lightning strikes them (works like a bomb blast), and it falls asleep again.
+  const GIANT_WARN = 1.1, GIANT_AWAKE = 2.4, GIANT_NAP = 3, GIANT_BOLTS = 5;
+  function wakeGiant(g, by) {
+    const G = g.giant; if (!G || G.st !== 0 || G.cd > 0) return;
+    const free = i => isFloor(g.map[i]) && !g.bombAt[i];
+    const all = []; for (let i = 0; i < W * H; i++) if (free(i)) all.push(i);
+    const alive = g.players.filter(p => p && p.st === 0), pick = new Set();
+    for (let k = 0; k < GIANT_BOLTS * 6 && pick.size < GIANT_BOLTS && all.length; k++) {
+      let i;
+      if (alive.length && g.rand() < 0.5) { // half the bolts land around someone
+        const p = alive[(g.rand() * alive.length) | 0], x = Math.round(p.x) + ((g.rand() * 3) | 0) - 1, y = Math.round(p.y) + ((g.rand() * 3) | 0) - 1;
+        if (x < 1 || y < 1 || x > W - 2 || y > H - 2 || !free(idx(x, y))) continue;
+        i = idx(x, y);
+      } else i = all[(g.rand() * all.length) | 0];
+      pick.add(i);
+    }
+    G.st = 1; G.t = 0; G.warn = [...pick]; G.by = by;
+    ev(g, 'giantWake', by, -1);
+  }
+  function giantStep(g, dt) {
+    const G = g.giant; if (!G) return;
+    if (G.st === 0) { if (G.cd > 0) G.cd -= dt; return; }
+    const t0 = G.t; G.t += dt;
+    if (t0 < GIANT_WARN && G.t >= GIANT_WARN) {
+      for (const i of G.warn) {
+        if (g.map[i] === 'x') { g.map[i] = '.'; g.drops[i] = g.hid[i]; g.hid[i] = null; }
+        if (g.items[i] && !g.drops[i]) g.items[i] = null;
+        g.flames[i] = FLAME_TIME; g.flameOwner[i] = -4;
+        const ob = g.bombAt[i]; if (ob) ob.t = Math.min(ob.t, 0.05);
+      }
+      ev(g, 'bolt', -4, G.warn.join('.'));
+    }
+    if (G.t >= GIANT_AWAKE) { G.st = 0; G.t = 0; G.warn = []; G.cd = GIANT_NAP; ev(g, 'giantSleep', -4, -1); }
   }
 
   function placeBomb(g, p, want) {
@@ -921,7 +962,7 @@ const SIM = (() => {
     while (g.sd.acc >= SUDDEN_STEP && g.sd.k < SPIRAL.length) {
       g.sd.acc -= SUDDEN_STEP;
       const i = SPIRAL[g.sd.k++];
-      if (g.map[i] === '#') continue;
+      if (g.map[i] === '#' || g.map[i] === 'C') continue;
       g.map[i] = '#'; g.items[i] = null; g.hid[i] = null; g.drops[i] = null; g.flames[i] = 0;
       const b = g.bombAt[i];
       if (b) { g.bombs.splice(g.bombs.indexOf(b), 1); g.bombAt[i] = null; }
@@ -975,6 +1016,7 @@ const SIM = (() => {
     }
 
     for (const n of g.npcs) npcStep(g, n, dt);
+    giantStep(g, dt);
     if (g.mapId === 'classic') beesStep(g, dt);
     for (let k = g.flyItems.length - 1; k >= 0; k--) {
       const f = g.flyItems[k]; f.t += dt;
@@ -1075,6 +1117,7 @@ const SIM = (() => {
         for (const [xx, yy] of blastCells(g, x, y, b.fire)) { const i = idx(xx, yy); if (tb < D[i]) D[i] = tb; }
       }
     }
+    if (g.giant && g.giant.st === 1 && g.giant.t < GIANT_WARN) for (const i of g.giant.warn) D[i] = Math.min(D[i], GIANT_WARN - g.giant.t);
     if (g.sd) for (let j = 0; j < 10 && g.sd.k + j < SPIRAL.length; j++) {
       const i = SPIRAL[g.sd.k + j], tt = (j + 1) * SUDDEN_STEP - g.sd.acc;
       if (tt < D[i]) D[i] = Math.max(0, tt);
@@ -1217,6 +1260,7 @@ const SIM = (() => {
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
       p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
+      gi: g.giant ? [g.giant.x0, g.giant.y0, g.giant.w, g.giant.h, g.giant.st, Math.round(g.giant.t * 10), g.giant.warn] : 0,
       be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
@@ -1955,7 +1999,7 @@ const THEMES = {
 const MAP_INFO = {
   classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng 2 con 🐝 ong bay lượn trên sân, thỉnh thoảng chui vào bụi rồi hiện ra chỗ khác: lại gần 2 ô là bị đuổi chích, choáng 2 giây.' },
   river: { name: '🌊 Sông ngã tư', theme: 'grass', desc: 'Sông chữ thập chia sân thành 4 vùng, mỗi nhánh sông chỉ có 1 cây cầu. Tia nước và bom ném bay qua sông được, người thì không.' },
-  storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông, nhà của 2 anh em Ông Mây Giông — bom rơi gấp đôi!' },
+  storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông. Giữa sân có 💤 Mây Khổng Lồ đang ngủ: tia nổ trúng nó là nó giật mình, giật sét 5 ô (ô vàng nhấp nháy), ai đứng trong ô là dính như trúng bom.' },
   portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
 };
 let curTheme = 'grass';
@@ -2046,12 +2090,12 @@ function onNewState(S, prev) {
   }
 }
 
-function seatName(S, s) { if (s === -2) return 'Ông Mây Giông'; const st = S?.s?.[s]; return st ? (st[1] || ('Ghế ' + (s + 1))) : ('Ghế ' + (s + 1)); }
+function seatName(S, s) { if (s === -2) return 'Ông Mây Giông'; if (s === -4) return 'Mây Khổng Lồ'; const st = S?.s?.[s]; return st ? (st[1] || ('Ghế ' + (s + 1))) : ('Ghế ' + (s + 1)); }
 function eventText(e, S) {
   const n = s => seatName(S, s);
   switch (e.k) {
     case 'start': return { t: '🏁 Trận đấu bắt đầu!', sys: 1 };
-    case 'trap': if (e.a === -2) return { t: `⛈️ ${n(e.b)} dính bom của Ông Mây Giông!` }; return { t: e.a === e.b ? `🫧 ${n(e.b)} tự dính bóng nước của mình!` : e.a >= 0 ? `🫧 ${n(e.b)} bị ${n(e.a)} nhốt vào bong bóng!` : `🫧 ${n(e.b)} bị nhốt vào bong bóng!` };
+    case 'trap': if (e.a === -2) return { t: `⛈️ ${n(e.b)} dính bom của Ông Mây Giông!` }; if (e.a === -4) return { t: `⚡ ${n(e.b)} bị Mây Khổng Lồ giật sét!` }; return { t: e.a === e.b ? `🫧 ${n(e.b)} tự dính bóng nước của mình!` : e.a >= 0 ? `🫧 ${n(e.b)} bị ${n(e.a)} nhốt vào bong bóng!` : `🫧 ${n(e.b)} bị nhốt vào bong bóng!` };
     case 'pop': return { t: `💥 ${n(e.a)} chọc vỡ bong bóng — ${n(e.b)} bị loại! (+1 ⭐)` };
     case 'drown': return { t: e.a >= 0 ? `😵 ${n(e.b)} không thoát kịp — ${n(e.a)} được +1 ⭐` : `😵 ${n(e.b)} không thoát kịp khỏi bong bóng!` };
     case 'rescue': return { t: `🤝 ${n(e.a)} giải cứu đồng đội ${n(e.b)}!` };
@@ -2083,6 +2127,15 @@ function handleEvent(e, S) {
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
+  if (e.k === 'giantWake') { tone(120, 380, 0.35, 'sawtooth', 0.09); tone(600, 900, 0.15, 'square', 0.05, 0.25); addFeed(`⚡ ${e.a >= 0 ? seatName(S, e.a) + ' làm' : 'Bom làm'} Mây Khổng Lồ tỉnh giấc! Nó sắp giật sét 5 ô!`, 'sys'); return; }
+  if (e.k === 'giantSleep') return;
+  if (e.k === 'bolt') {
+    const cells = String(e.b).split('.').map(Number).filter(n => n >= 0);
+    R.bolts = R.bolts || []; R.bolts.push({ t: now, cells, seed: Array.from({ length: 8 }, () => Math.random()) });
+    R.shake = Math.max(R.shake || 0, 0.35); noise(0.7, 0.3, 300); tone(80, 40, 0.6, 'sawtooth', 0.1);
+    for (const i of cells) spawnDebris(i % W, (i / W) | 0, '#fff36b', 8);
+    return;
+  }
   if (e.k === 'bee' || e.k === 'beeHide') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#8fdc5a', 6); return; }
   if (e.k === 'beeChase') { tone(180, 230, 0.6, 'sawtooth', 0.05); tone(185, 220, 0.6, 'square', 0.025, 0.05); return; }
   if (e.k === 'beeDie') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#ffd21f', 8); tone(400, 120, 0.2, 'triangle', 0.08); return; }
@@ -2191,6 +2244,13 @@ function drawBoard(S, dt, now) {
     if (b === '=') drawBridge(x, y);
     if (b === 'o') drawPortal(x, y, now, i);
   }
+  // cells the giant cloud is about to strike
+  if (S.gi && S.gi[4] === 1) for (const i of S.gi[6] || []) {
+    const x = i % W, y = (i / W) | 0, pulse = 0.5 + 0.5 * Math.sin(now * 20);
+    ctx.fillStyle = `rgba(255,230,60,${0.18 + pulse * 0.25})`; ctx.beginPath(); ctx.ellipse(SX(x), SY(y), T * 0.46, TY * 0.42, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(255,240,90,${0.6 + pulse * 0.4})`; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = `${Math.round(T * 0.5)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚡', SX(x), SY(y) - TY * 0.05);
+  }
   // landing warnings for falling bombs
   for (const b of S.b || []) if (b[5] >= 0) {
     const x = b[5] % W, y = (b[5] / W) | 0, pulse = 0.5 + 0.5 * Math.sin(now * 14);
@@ -2237,6 +2297,7 @@ function drawBoard(S, dt, now) {
       else if (c === 'x') drawSprite('crate', x, y);
       else if (ITEM_ICON[c]) drawItem(c, x, y, now);
     }
+    if (S.gi && y === S.gi[1] + S.gi[3] - 1) drawGiant(S.gi, now);
     for (const b of bombRows[y] || []) drawBomb(b, now);
     const pb = R.pendingBomb;
     if (pb && (pb.cell / W | 0) === y) {
@@ -2270,6 +2331,7 @@ function drawBoard(S, dt, now) {
   }
   ctx.globalAlpha = 1;
   drawFlashes(now);
+  drawBolts(S, now);
   // name tags on top
   for (let s = 0; s < MAXP; s++) drawTag(S, s);
   ctx.restore();
@@ -2654,6 +2716,81 @@ function drawPlayer(S, s, now) {
     ctx.beginPath(); ctx.arc(cx, bcy, br + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (tl / SIM.TRAP_TIME)); ctx.stroke();
   }
   ctx.restore();
+}
+// ---- the giant storm cloud asleep in the middle of the storm map
+function drawGiant(gi, now) {
+  const [x0, y0, w, h, st, t10] = gi, awake = st === 1, t = t10 / 10;
+  const cx0 = SX(x0 + (w - 1) / 2), gy = SY(y0 + (h - 1) / 2);
+  const breathe = awake ? 1 : 1 + Math.sin(now * 1.6) * 0.03;
+  const shake = awake ? (Math.random() - 0.5) * T * 0.12 : 0, cx = cx0 + shake;
+  const r = T * 0.62 * breathe, cy = gy - HZ * 0.9 - (awake ? Math.abs(Math.sin(now * 9)) * T * 0.05 : 0);
+  // shadow on the ground
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(cx0, gy + TY * 0.35, T * 1.75, TY * 0.95, 0, 0, 7); ctx.fill();
+  if (awake) { const gl = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 4); gl.addColorStop(0, 'rgba(255,240,90,.45)'); gl.addColorStop(1, 'rgba(255,240,90,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, r * 4, 0, 7); ctx.fill(); }
+  const puffs = [[-2.05, 0.45, 0.9], [2.05, 0.45, 0.9], [-1.3, -0.25, 1.15], [1.3, -0.2, 1.2], [0, -0.65, 1.4], [-0.7, 0.55, 1.05], [0.75, 0.55, 1.05]];
+  ctx.fillStyle = awake ? '#5a4a10' : '#2b3145';
+  ctx.beginPath(); for (const [dx, dy, pr] of puffs) { ctx.moveTo(cx + dx * r + pr * r + 4, cy + dy * r); ctx.arc(cx + dx * r, cy + dy * r, pr * r + 4, 0, 7); } ctx.fill();
+  const g = ctx.createLinearGradient(0, cy - r * 2.2, 0, cy + r * 1.6);
+  if (awake) { const f = 0.5 + 0.5 * Math.sin(now * 25); g.addColorStop(0, '#fffbe0'); g.addColorStop(0.5, `rgb(255,${225 + f * 25 | 0},120)`); g.addColorStop(1, '#c79a1c'); }
+  else { g.addColorStop(0, '#d9deec'); g.addColorStop(0.55, '#a7b0c8'); g.addColorStop(1, '#5d6684'); }
+  ctx.fillStyle = g; ctx.beginPath(); for (const [dx, dy, pr] of puffs) { ctx.moveTo(cx + dx * r + pr * r, cy + dy * r); ctx.arc(cx + dx * r, cy + dy * r, pr * r, 0, 7); } ctx.fill();
+  // face
+  const ex = r * 0.75, ey = cy - r * 0.05;
+  ctx.strokeStyle = '#1b1f2e'; ctx.fillStyle = '#1b1f2e'; ctx.lineWidth = Math.max(2.5, T * 0.07); ctx.lineCap = 'round';
+  if (awake) {
+    for (const sx of [-1, 1]) {
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(cx + sx * ex, ey, r * 0.36, r * 0.42, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#1b1f2e'; ctx.beginPath(); ctx.arc(cx + sx * ex + (Math.random() - 0.5) * 2, ey + r * 0.05, r * 0.11, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx + sx * (ex - r * 0.35), ey - r * 0.62); ctx.lineTo(cx + sx * (ex + r * 0.3), ey - r * 0.48); ctx.stroke(); // raised brows
+    }
+    ctx.fillStyle = '#3a1010'; ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.62, r * 0.32, r * 0.3, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.font = `900 ${Math.round(T * 0.55)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    const bx = cx + r * 2.2, by = cy - r * 1.7; ctx.strokeText('!!', bx, by); ctx.fillText('!!', bx, by);
+    if (Math.floor(now * 16) % 2) { // crackling sparks
+      ctx.strokeStyle = '#fff36b'; ctx.lineWidth = 3; ctx.beginPath();
+      for (const sx of [-1, 1]) { ctx.moveTo(cx + sx * r * 2.4, cy + r * 0.6); ctx.lineTo(cx + sx * r * 2.1, cy + r * 1.2); ctx.lineTo(cx + sx * r * 2.5, cy + r * 1.3); ctx.lineTo(cx + sx * r * 2.2, cy + r * 2); }
+      ctx.stroke();
+    }
+  } else {
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sx * ex, ey - r * 0.05, r * 0.24, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); } // closed eyes
+    ctx.beginPath(); ctx.ellipse(cx, cy + r * 0.55, r * 0.13, r * 0.09 * (1 + Math.sin(now * 1.6) * 0.4), 0, 0, 7); ctx.fill(); // snoring mouth
+    ctx.fillStyle = 'rgba(255,170,190,.55)'; for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + sx * r * 1.15, cy + r * 0.3, r * 0.22, r * 0.12, 0, 0, 7); ctx.fill(); }
+    // Z z z
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 0; k < 3; k++) {
+      const ph = (now * 0.45 + k / 3) % 1, zx = cx + r * (1.3 + ph * 1.2), zy = cy - r * (1.4 + ph * 1.8);
+      ctx.globalAlpha = Math.sin(ph * Math.PI); ctx.font = `900 ${Math.round(T * (0.28 + ph * 0.3))}px "Baloo 2",sans-serif`;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#2b3145'; ctx.strokeText('Z', zx, zy); ctx.fillStyle = '#ffffff'; ctx.fillText('Z', zx, zy);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.lineCap = 'butt';
+  // name sash
+  ctx.font = `800 ${Math.max(10, Math.round(T * 0.25))}px "Baloo 2",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const lbl = awake ? '⚡ Mây Khổng Lồ tỉnh giấc!' : '💤 Mây Khổng Lồ', lw = ctx.measureText(lbl).width + 14, lh = Math.max(15, T * 0.3), ly = cy + r * 1.55;
+  ctx.fillStyle = '#2b3145'; rr(ctx, cx0 - lw / 2 - 2, ly - lh / 2 - 2, lw + 4, lh + 4, (lh + 4) / 2); ctx.fill();
+  ctx.fillStyle = awake ? '#c7911a' : '#43357f'; rr(ctx, cx0 - lw / 2, ly - lh / 2, lw, lh, lh / 2); ctx.fill();
+  ctx.fillStyle = '#fff3c4'; ctx.fillText(lbl, cx0, ly + 1);
+}
+// lightning bolts from the giant to the struck cells
+function drawBolts(S, now) {
+  if (!R.bolts || !R.bolts.length) return;
+  const gi = S.gi;
+  for (let k = R.bolts.length - 1; k >= 0; k--) {
+    const B = R.bolts[k], a = now - B.t; if (a > 0.55 || !gi) { R.bolts.splice(k, 1); continue; }
+    const fade = 1 - a / 0.55, sx = SX(gi[0] + (gi[2] - 1) / 2), sy = SY(gi[1]) - HZ * 2;
+    if (a < 0.12) { ctx.fillStyle = `rgba(255,255,230,${0.35 * (1 - a / 0.12)})`; ctx.fillRect(0, 0, VW, VH); }
+    for (const i of B.cells) {
+      const tx = SX(i % W), ty = SY((i / W) | 0), seg = 7;
+      ctx.save(); ctx.lineJoin = 'round';
+      for (const [lw, col] of [[Math.max(8, T * 0.22), `rgba(255,240,120,${0.35 * fade})`], [Math.max(3, T * 0.08), `rgba(255,255,255,${fade})`]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(sx, sy);
+        for (let j = 1; j < seg; j++) { const u = j / seg, jit = (B.seed[j] - 0.5) * T * 0.9; ctx.lineTo(sx + (tx - sx) * u + jit, sy + (ty - sy) * u); }
+        ctx.lineTo(tx, ty); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
 }
 // bright burst where a portal drops someone off
 function drawFlashes(now) {
@@ -3312,6 +3449,7 @@ const AUTO = {
   rescue: (a, b) => [`${a} giải cứu đồng đội ${b} quá kịp thời!`, `Tinh thần đồng đội! ${a} cứu ${b}!`],
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
+  giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],

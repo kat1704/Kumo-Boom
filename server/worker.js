@@ -83,7 +83,9 @@ const SIM = (() => {
           if (side < 0 ? a < 2 : a > (horiz ? W : H) - 3) continue;
           const across = horiz ? [[x, y - 1], [x, y + 1]] : [[x - 1, y], [x + 1, y]];
           const along = horiz ? [[x - 1, y], [x + 1, y]] : [[x, y - 1], [x, y + 1]];
-          if (!across.every(([cx, cy]) => inside(cx, cy) && !wet(cx, cy))) continue;
+          if (!across.every(([cx, cy]) => inside(cx, cy) && !wet(cx, cy) && !pillar(cx, cy))) continue;
+          // each end of the bridge must open onto more ground, not a dead end boxed in by pillars and water
+          if (!across.every(([cx, cy]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const nx = cx + dx, ny = cy + dy; return (nx !== x || ny !== y) && inside(nx, ny) && !wet(nx, ny) && !pillar(nx, ny); }))) continue;
           if (!along.every(([cx, cy]) => wet(cx, cy))) continue;
           out.push({ i, heads: across.map(([cx, cy]) => cy * W + cx) });
         }
@@ -127,6 +129,7 @@ const SIM = (() => {
       else if (mapId === 'storm' && x >= (W - 1) / 2 - 1 && x <= (W - 1) / 2 + 1 && y >= (H - 1) / 2 - 1 && y <= (H - 1) / 2 - (H % 4 === 1 ? 0 : 0)) map[i] = 'C';
       else if (river && river.bridge.has(i)) map[i] = '=';
       else if (river && river.water.has(i)) map[i] = '~';
+      else if (river && river.heads.has(i)) map[i] = '.'; // bridge heads are always open ground
       else if (x % 2 === 0 && y % 2 === 0) map[i] = '#';
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';

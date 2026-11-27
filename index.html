@@ -640,7 +640,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, rifts: [], nextRift: 22, geysers: [], geyT: 3 + rand() * 2,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, rifts: [], nextRift: 45, geysers: [], geyT: 3 + rand() * 2,
       giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
@@ -801,6 +801,17 @@ const SIM = (() => {
     }
   }
 
+  // how much open ground can you walk to from cell i (bombs and crates block)? capped at `cap`
+  function openRoom(g, i, cap) {
+    const walk = j => { const c = g.map[j]; return (c === '.' || c === 'g' || c === '=' || c === 'o' || c === 'r') && !g.bombAt[j]; };
+    const seen = new Set([i]), q = [i];
+    while (q.length && seen.size < cap) {
+      const k = q.pop();
+      for (const d of [1, -1, W, -W]) { const j = k + d; if (j < 0 || j >= W * H || seen.has(j) || !walk(j)) continue; seen.add(j); q.push(j); }
+    }
+    return seen.size;
+  }
+
   // ---- gates: the 4 portals ('o') are linked to each other, space rifts ('r') come in linked pairs
   const isGate = c => c === 'o' || c === 'r';
   function gateExits(g, i) {
@@ -812,7 +823,7 @@ const SIM = (() => {
   function riftStep(g) {
     const el = g.roundTime - g.timeLeft;
     if (el < g.nextRift || g.rifts.length >= 6) return;
-    g.nextRift = el + Math.max(12, 22 - g.rifts.length * 2);
+    g.nextRift = el + 3; // if there's no good spot yet, look again shortly
     const gates = []; for (let i = 0; i < W * H; i++) if (isGate(g.map[i])) gates.push(i);
     const ok = i => {
       const c = g.map[i]; if (!(c === '.' || c === 'g') || g.bombAt[i] || g.items[i] || g.flames[i] > 0) return false;
@@ -820,7 +831,7 @@ const SIM = (() => {
       if (nearSpawn(x, y)) return false;
       if (gates.some(j => Math.abs(j % W - x) + Math.abs(((j / W) | 0) - y) < 3)) return false;
       if (g.players.some(p => p && p.st !== 2 && Math.abs(p.x - x) < 1 && Math.abs(p.y - y) < 1)) return false;
-      return true;
+      return openRoom(g, i, 6) >= 6; // never open a rift into a pocket you can't walk out of
     };
     const cand = []; for (let i = 0; i < W * H; i++) if (ok(i)) cand.push(i);
     if (cand.length < 2) return;
@@ -829,6 +840,7 @@ const SIM = (() => {
     if (!far.length) return;
     const b = far[(Math.random() * far.length) | 0];
     g.map[a] = 'r'; g.map[b] = 'r'; g.rifts.push({ a, b });
+    g.nextRift = el + Math.max(18, 30 - g.rifts.length * 3);
     ev(g, 'rift', -1, a * 1000 + b);
   }
 
@@ -839,6 +851,7 @@ const SIM = (() => {
       const c = g.map[i]; if (!(c === '.' || c === 'g' || c === '=') || g.bombAt[i] || g.flames[i] > 0) continue;
       const x = i % W, y = (i / W) | 0;
       if (g.players.some(q => q && q !== p && q.st !== 2 && Math.abs(q.x - x) + Math.abs(q.y - y) < 1.5)) continue;
+      if (openRoom(g, i, 6) < 6) continue; // no dead-end pockets boxed in by crates and pillars
       cand.push(i); if (D[i] === Infinity) ok.push(i);
     }
     const pool = ok.length ? ok : cand; if (!pool.length) return;
@@ -1185,7 +1198,7 @@ const SIM = (() => {
         if (Math.abs(p.x - cx) >= 0.35 || Math.abs(p.y - cy) >= 0.35 || cell === p.gateLock) continue;
         if (g.map[cell] === 'o') teleport(g, p, cell);
         else if (g.map[cell] === 'r') {
-          const ex = gateExits(g, cell)[0]; if (ex === undefined) continue;
+          const ex = gateExits(g, cell)[0]; if (ex === undefined || openRoom(g, ex, 3) < 3) continue; // far side blocked: stay put
           p.x = ex % W; p.y = (ex / W) | 0; p.ghost.clear(); p.lockT = 0.7; p.gateLock = ex; p.tpCd = 0.3;
           ev(g, 'tele', p.seat, cell * 1000 + ex);
         }

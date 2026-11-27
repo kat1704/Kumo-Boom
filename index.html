@@ -465,7 +465,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 🐝 ong núp trong bụi chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Phách thần (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -578,7 +578,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeT: 6 + rand() * 3, beeId: 0,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
@@ -742,54 +742,62 @@ const SIM = (() => {
     ev(g, 'tele', p.seat, from * 1000 + to);
   }
 
-  // ---- bees hiding in the meadow's bushes: one darts out, stings a nearby player (2s daze) and hides again
-  const BEE_SPEED = 4.6, BEE_BACK = 5.5, BEE_LIFE = 3.2, STUN_TIME = 2;
-  function beesStep(g, dt) {
-    const alive = g.players.filter(p => p && p.st === 0);
-    g.beeT -= dt;
-    if (g.beeT <= 0) {
-      g.beeT = 3.5 + Math.random() * 4.5;
-      if (g.bees.length < Math.max(2, Math.ceil(alive.length / 2))) {
-        const cands = [];
-        for (let i = 0; i < W * H; i++) {
-          if (g.map[i] !== 'g' || g.flames[i] > 0) continue;
-          const x = i % W, y = (i / W) | 0;
-          for (const p of alive) {
-            if (p.stun > 0 || p.inv > 0 || g.bees.some(b => b.tgt === p.seat)) continue;
-            const d = Math.hypot(p.x - x, p.y - y);
-            if (d > 0.6 && d <= 3) cands.push({ x, y, p });
-          }
-        }
-        if (cands.length) {
-          const c = cands[(Math.random() * cands.length) | 0];
-          g.bees.push({ id: ++g.beeId, x: c.x, y: c.y, z: 0, tgt: c.p.seat, go: 1, t: 0 });
-          ev(g, 'bee', -1, c.p.seat);
-        }
-      }
+  // ---- bees of the meadow: 2 bees roam the map in plain sight, now and then dive into a bush and pop out
+  // of another one. Anyone who comes within 2 tiles gets chased and stung (2s daze).
+  const BEE_COUNT = 2, BEE_WANDER = 1.7, BEE_SPEED = 4.8, BEE_BACK = 4, BEE_RANGE = 2, STUN_TIME = 2;
+  const bushes = g => { const o = []; for (let i = 0; i < W * H; i++) if (g.map[i] === 'g') o.push(i); return o; };
+  function beeTarget(b) { // a new spot to drift to, near where it is
+    for (let k = 0; k < 8; k++) {
+      const x = Math.max(1, Math.min(W - 2, b.x + (Math.random() * 6 - 3))), y = Math.max(1, Math.min(H - 2, b.y + (Math.random() * 6 - 3)));
+      if (Math.hypot(x - b.x, y - b.y) > 1) { b.tx = x; b.ty = y; return; }
     }
-    for (let k = g.bees.length - 1; k >= 0; k--) {
-      const b = g.bees[k]; b.t += dt;
-      if (g.flames[idx(Math.round(b.x), Math.round(b.y))] > 0 && b.z < 0.9) { ev(g, 'beeDie', -1, idx(Math.round(b.x), Math.round(b.y))); g.bees.splice(k, 1); continue; }
-      if (b.go) {
-        const p = g.players[b.tgt];
-        if (!p || p.st !== 0 || b.t > BEE_LIFE) { b.go = 0; continue; }
+    b.tx = 1 + Math.random() * (W - 3); b.ty = 1 + Math.random() * (H - 3);
+  }
+  function beeAppear(g, b) {
+    const list = bushes(g).filter(i => !g.players.some(p => p && p.st === 0 && Math.hypot(p.x - i % W, p.y - ((i / W) | 0)) < 3));
+    const pool = list.length ? list : bushes(g);
+    if (!pool.length) { b.hide = 2; return; }
+    const i = pool[(Math.random() * pool.length) | 0];
+    b.x = i % W; b.y = (i / W) | 0; b.z = 0; b.st = 0; b.hide = 0; b.roam = 7 + Math.random() * 6; b.home = null; b.tgt = -1; b.t = 0;
+    beeTarget(b); ev(g, 'bee', -1, i);
+  }
+  function beesStep(g, dt) {
+    if (!g.bees.length) for (let k = 0; k < BEE_COUNT; k++) { const b = { id: ++g.beeId, x: 0, y: 0, z: 0, st: 3, hide: 1 + k * 2.5 }; g.bees.push(b); }
+    for (const b of g.bees) {
+      if (b.st === 3) { b.hide -= dt; if (b.hide <= 0) beeAppear(g, b); continue; } // hiding in a bush
+      b.t += dt;
+      if (b.z < 0.9 && g.flames[idx(Math.round(b.x), Math.round(b.y))] > 0) { // caught by a water blast: knocked back into the grass
+        ev(g, 'beeDie', -1, idx(Math.round(b.x), Math.round(b.y))); b.st = 3; b.hide = 6 + Math.random() * 3; continue;
+      }
+      if (b.st === 0) { // roaming
+        b.z = Math.min(0.6, b.z + dt * 2);
+        const prey = g.players.filter(p => p && p.st === 0 && p.stun <= 0 && p.inv <= 0 && Math.hypot(p.x - b.x, p.y - b.y) <= BEE_RANGE)
+          .sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y))[0];
+        if (prey) { b.st = 1; b.tgt = prey.seat; b.chase = 2.5; ev(g, 'beeChase', -1, prey.seat); continue; }
+        b.roam -= dt;
+        if (b.roam <= 0) { b.st = 2; b.home = null; continue; }
+        const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
+        if (d < 0.1) { beeTarget(b); continue; }
+        const m = Math.min(d, BEE_WANDER * dt); b.x += dx / d * m; b.y += dy / d * m;
+      } else if (b.st === 1) { // chasing
+        const p = g.players[b.tgt]; b.chase -= dt;
+        if (!p || p.st !== 0 || p.stun > 0 || b.chase <= 0) { b.st = 0; b.roam = Math.max(b.roam, 2); beeTarget(b); continue; }
         const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy);
         if (d < 0.4) {
-          b.go = 0;
-          if (p.inv <= 0 && p.stun <= 0) { p.stun = STUN_TIME; p.moving = 0; ev(g, 'sting', -3, p.seat); }
-          continue;
+          if (p.inv <= 0) { p.stun = STUN_TIME; p.moving = 0; ev(g, 'sting', -3, p.seat); }
+          b.st = 2; b.home = null; continue; // job done: go hide
         }
-        const m = Math.min(d, BEE_SPEED * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.min(0.7, b.z + dt * 3);
-      } else {
-        if (b.home == null) { // nearest bush to hide in
+        const m = Math.min(d, BEE_SPEED * dt); b.x += dx / d * m; b.y += dy / d * m;
+      } else if (b.st === 2) { // heading into the nearest bush
+        if (b.home == null) {
           let best = -1, bd = 1e9;
-          for (let i = 0; i < W * H; i++) if (g.map[i] === 'g') { const d = Math.hypot(i % W - b.x, ((i / W) | 0) - b.y); if (d < bd) { bd = d; best = i; } }
+          for (const i of bushes(g)) { const d = Math.hypot(i % W - b.x, ((i / W) | 0) - b.y); if (d < bd) { bd = d; best = i; } }
           b.home = best;
         }
-        if (b.home < 0) { g.bees.splice(k, 1); continue; }
+        if (b.home < 0) { b.st = 3; b.hide = 3; continue; }
         const hx = b.home % W, hy = (b.home / W) | 0, dx = hx - b.x, dy = hy - b.y, d = Math.hypot(dx, dy);
-        if (d < 0.15 || b.t > BEE_LIFE + 5) { g.bees.splice(k, 1); continue; }
-        const m = Math.min(d, BEE_BACK * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.max(0.1, Math.min(0.7, d * 0.6));
+        if (d < 0.12) { b.st = 3; b.hide = 2.5 + Math.random() * 3; ev(g, 'beeHide', -1, b.home); continue; }
+        const m = Math.min(d, BEE_BACK * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.max(0.05, Math.min(0.6, d * 0.5));
       }
     }
   }
@@ -1209,7 +1217,7 @@ const SIM = (() => {
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
       p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
-      be: (g.bees || []).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.go, b.id]),
+      be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
       e: g.events.slice(-8), w: g.wins, sc: g.score, wn: g.winner, mp: g.mapId,
@@ -1931,7 +1939,7 @@ const THEMES = {
   portal: { floorA: '#3a3163', floorB: '#443a72', grass: false, wallTop: ['#8f7bd0', '#6f5bb0'], wallFront: '#3f2f78', pillar: ['#5a45a0', '#9c88e0', '#47358a', '#e1d8ff', '#8f7bd0'] },
 };
 const MAP_INFO = {
-  classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng: 🐝 ong trong bụi thỉnh thoảng bay ra chích người đứng gần, choáng 2 giây rồi lại trốn vào bụi.' },
+  classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng 2 con 🐝 ong bay lượn trên sân, thỉnh thoảng chui vào bụi rồi hiện ra chỗ khác: lại gần 2 ô là bị đuổi chích, choáng 2 giây.' },
   river: { name: '🌊 Sông ngã tư', theme: 'grass', desc: 'Sông chữ thập chia sân thành 4 vùng, mỗi nhánh sông chỉ có 1 cây cầu. Tia nước và bom ném bay qua sông được, người thì không.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông, nhà của 2 anh em Ông Mây Giông — bom rơi gấp đôi!' },
   portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
@@ -2061,12 +2069,13 @@ function handleEvent(e, S) {
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
-  if (e.k === 'bee') { tone(180, 210, 0.5, 'sawtooth', 0.04); tone(185, 200, 0.5, 'square', 0.02, 0.05); return; }
+  if (e.k === 'bee' || e.k === 'beeHide') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#8fdc5a', 6); return; }
+  if (e.k === 'beeChase') { tone(180, 230, 0.6, 'sawtooth', 0.05); tone(185, 220, 0.6, 'square', 0.025, 0.05); return; }
   if (e.k === 'beeDie') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#ffd21f', 8); tone(400, 120, 0.2, 'triangle', 0.08); return; }
   if (e.k === 'sting') {
     tone(1400, 600, 0.12, 'square', 0.08); tone(500, 300, 0.4, 'sine', 0.06, 0.1);
     const p = S.p[e.b]; if (p) spawnDebris(p[0] / 100, p[1] / 100, '#ffe14d', 10);
-    addFeed(`🐝 Ong trong bụi cỏ chích ${seatName(S, e.b)}, choáng 2 giây!`, 'sys'); return;
+    addFeed(`🐝 Ong chích ${seatName(S, e.b)}, choáng 2 giây!`, 'sys'); return;
   }
   if (e.k === 'item') return;
   const tx = eventText(e, S);
@@ -2342,7 +2351,7 @@ function drawBees(S, now, dt) {
     if (!d) { d = { x: tx, y: ty, z: tz }; beeDisp.set(id, d); }
     const k = Math.min(1, dt * 14); d.x += (tx - d.x) * k; d.y += (ty - d.y) * k; d.z += (tz - d.z) * k;
     const wob = Math.sin(now * 23 + id) * 0.06, cx = SX(d.x + wob), cy = SY(d.y) - HZ * (0.35 + d.z * 1.1) + Math.sin(now * 17 + id * 3) * T * 0.04;
-    const s = Math.max(8, T * 0.24), dir = (tx - d.x) < -0.01 ? -1 : 1;
+    const s = Math.max(10, T * 0.3), dir = (tx - d.x) < -0.01 ? -1 : 1;
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(SX(d.x), SY(d.y), s * 0.8, s * 0.35, 0, 0, 7); ctx.fill();
     ctx.save(); ctx.translate(cx, cy); ctx.scale(dir, 1);

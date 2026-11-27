@@ -465,7 +465,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Bờ sông (sông chữ thập uốn lượn chia 4 khu, mỗi nhánh 1 cầu; cá thỉnh thoảng nhô lên phun nước, trúng là đi cực chậm 4 giây) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Bờ sông (sông chữ thập uốn lượn chia 4 khu, mỗi nhánh 1 cầu; cá thỉnh thoảng nhô lên phun nước, trúng là đi cực chậm 4 giây) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (thành phố Cyberpunk: 4 cổng dịch chuyển ngẫu nhiên, càng về sau càng mở thêm vết nứt không gian nối từng cặp; tia nổ và bom bị đá đi xuyên qua cổng). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Naruko (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -640,7 +640,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, geysers: [], geyT: 3 + rand() * 2,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, rifts: [], nextRift: 22, geysers: [], geyT: 3 + rand() * 2,
       giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
@@ -779,6 +779,17 @@ const SIM = (() => {
         const step = Math.min(dist, 0.1); dist -= step;
         const nx = b.x + b.vx, ny = b.y + b.vy;
         const along = b.vx ? b.fx - b.x : b.fy - b.y, sgn = b.vx || b.vy;
+        if (sgn * along >= -1e-6 && nx >= 0 && ny >= 0 && nx < W && ny < H && isGate(g.map[idx(nx, ny)])) { // slide into a gate, come out of the linked one
+          const gi = idx(nx, ny), exits = gateExits(g, gi), ex = exits.length ? exits[(Math.random() * exits.length) | 0] : -1;
+          const ox = ex % W + b.vx, oy = ((ex / W) | 0) + b.vy;
+          if (ex >= 0 && passableForBomb(g, b, ox, oy)) {
+            g.bombAt[idx(b.x, b.y)] = null; b.x = ox; b.y = oy; b.fx = ox; b.fy = oy; g.bombAt[idx(ox, oy)] = b;
+            for (const q of g.players) if (q && q.st !== 2 && Math.abs(q.x - ox) < 0.95 && Math.abs(q.y - oy) < 0.95) q.ghost.add(b.id);
+            ev(g, 'btele', -1, gi * 1000 + ex);
+            continue;
+          }
+          b.fx = b.x; b.fy = b.y; b.vx = 0; b.vy = 0; break;
+        }
         if (!passableForBomb(g, b, nx, ny) && sgn * along >= -1e-6) {
           b.fx = b.x; b.fy = b.y; b.vx = 0; b.vy = 0; break; // stop at cell center
         }
@@ -788,6 +799,37 @@ const SIM = (() => {
         }
       }
     }
+  }
+
+  // ---- gates: the 4 portals ('o') are linked to each other, space rifts ('r') come in linked pairs
+  const isGate = c => c === 'o' || c === 'r';
+  function gateExits(g, i) {
+    if (g.map[i] === 'r') { const r = g.rifts.find(r => r.a === i || r.b === i); if (!r) return []; const e = r.a === i ? r.b : r.a; return g.map[e] === 'r' ? [e] : []; }
+    if (g.map[i] === 'o') return PORTALS.map(([x, y]) => idx(x, y)).filter(j => j !== i && g.map[j] === 'o');
+    return [];
+  }
+  // rifts tear open as the round goes on: a new linked pair every ~20s, up to 6 pairs
+  function riftStep(g) {
+    const el = g.roundTime - g.timeLeft;
+    if (el < g.nextRift || g.rifts.length >= 6) return;
+    g.nextRift = el + Math.max(12, 22 - g.rifts.length * 2);
+    const gates = []; for (let i = 0; i < W * H; i++) if (isGate(g.map[i])) gates.push(i);
+    const ok = i => {
+      const c = g.map[i]; if (!(c === '.' || c === 'g') || g.bombAt[i] || g.items[i] || g.flames[i] > 0) return false;
+      const x = i % W, y = (i / W) | 0;
+      if (nearSpawn(x, y)) return false;
+      if (gates.some(j => Math.abs(j % W - x) + Math.abs(((j / W) | 0) - y) < 3)) return false;
+      if (g.players.some(p => p && p.st !== 2 && Math.abs(p.x - x) < 1 && Math.abs(p.y - y) < 1)) return false;
+      return true;
+    };
+    const cand = []; for (let i = 0; i < W * H; i++) if (ok(i)) cand.push(i);
+    if (cand.length < 2) return;
+    const a = cand[(Math.random() * cand.length) | 0];
+    const far = cand.filter(i => Math.abs(i % W - a % W) + Math.abs(((i / W) | 0) - ((a / W) | 0)) >= Math.max(6, (W + H) / 3));
+    if (!far.length) return;
+    const b = far[(Math.random() * far.length) | 0];
+    g.map[a] = 'r'; g.map[b] = 'r'; g.rifts.push({ a, b });
+    ev(g, 'rift', -1, a * 1000 + b);
   }
 
   function teleport(g, p, from) {
@@ -968,17 +1010,24 @@ const SIM = (() => {
   }
 
   function blastCells(g, bx, by, fire, hit) {
-    const out = [[bx, by]];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      for (let k = 1; k <= fire; k++) {
-        const x = bx + dx * k, y = by + dy * k;
-        const c = g.map[idx(x, y)];
+    const out = [[bx, by]], used = new Set();
+    const ray = (x0, y0, dx, dy, n) => {
+      for (let k = 1; k <= n; k++) {
+        const x = x0 + dx * k, y = y0 + dy * k, i = idx(x, y);
+        if (x < 0 || y < 0 || x >= W || y >= H) break;
+        const c = g.map[i];
         if (c === 'C') { if (hit) hit.giant = true; break; }
         if (c === '#') break;
         out.push([x, y]);
         if (c === 'x') break;
+        if (isGate(c) && !used.has(i)) { // the blast goes in one gate and keeps going out of the linked one(s)
+          used.add(i);
+          for (const e of gateExits(g, i)) { if (used.has(e)) continue; used.add(e); out.push([e % W, (e / W) | 0]); ray(e % W, (e / W) | 0, dx, dy, n - k); }
+          break;
+        }
       }
-    }
+    };
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) ray(bx, by, dx, dy, fire);
     return out;
   }
 
@@ -1061,6 +1110,7 @@ const SIM = (() => {
       g.sd.acc -= SUDDEN_STEP;
       const i = SPIRAL[g.sd.k++];
       if (g.map[i] === '#' || g.map[i] === 'C') continue;
+      if (g.map[i] === 'r') { const k = g.rifts.findIndex(r => r.a === i || r.b === i); if (k >= 0) { const r = g.rifts[k], o = r.a === i ? r.b : r.a; if (g.map[o] === 'r') g.map[o] = '.'; g.rifts.splice(k, 1); } }
       g.map[i] = '#'; g.items[i] = null; g.hid[i] = null; g.drops[i] = null; g.flames[i] = 0;
       const b = g.bombAt[i];
       if (b) { g.bombs.splice(g.bombs.indexOf(b), 1); g.bombAt[i] = null; }
@@ -1124,12 +1174,22 @@ const SIM = (() => {
       f.fx = f.x0 + (f.tx - f.x0) * u; f.fy = f.y0 + (f.ty - f.y0) * u; f.z = 2 * (1 - u) + 4 * 0.8 * u * (1 - u);
       if (u >= 1) { const i = idx(f.tx, f.ty); if (isFloor(g.map[i]) && !g.bombAt[i]) g.items[i] = f.k; g.flyItems.splice(k, 1); }
     }
-    // portals
-    if (g.mapId === 'portal') for (const p of g.players) {
-      if (!p || p.st !== 0) continue;
-      if (p.tpCd > 0) { p.tpCd -= dt; continue; }
-      const cx = Math.round(p.x), cy = Math.round(p.y);
-      if (g.map[idx(cx, cy)] === 'o' && Math.abs(p.x - cx) < 0.35 && Math.abs(p.y - cy) < 0.35) teleport(g, p, idx(cx, cy));
+    // portals and space rifts
+    if (g.mapId === 'portal') {
+      riftStep(g);
+      for (const p of g.players) {
+        if (!p || p.st !== 0) continue;
+        const cx = Math.round(p.x), cy = Math.round(p.y), cell = idx(cx, cy);
+        if (p.gateLock !== undefined && p.gateLock !== cell) p.gateLock = -1; // stepped off the rift we came out of
+        if (p.tpCd > 0) { p.tpCd -= dt; continue; }
+        if (Math.abs(p.x - cx) >= 0.35 || Math.abs(p.y - cy) >= 0.35 || cell === p.gateLock) continue;
+        if (g.map[cell] === 'o') teleport(g, p, cell);
+        else if (g.map[cell] === 'r') {
+          const ex = gateExits(g, cell)[0]; if (ex === undefined) continue;
+          p.x = ex % W; p.y = (ex / W) | 0; p.ghost.clear(); p.lockT = 0.7; p.gateLock = ex; p.tpCd = 0.3;
+          ev(g, 'tele', p.seat, cell * 1000 + ex);
+        }
+      }
     }
     // bombs
     moveBombs(g, dt);
@@ -1360,6 +1420,7 @@ const SIM = (() => {
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
       p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10), Math.ceil((p.wet || 0) * 10)] : 0),
+      rf: (g.rifts || []).map(r => [r.a, r.b]),
       gi: g.giant ? [g.giant.x0, g.giant.y0, g.giant.w, g.giant.h, g.giant.st, Math.round(g.giant.t * 10), g.giant.warn] : 0,
       gy: (g.geysers || []).map(q => [q.s, q.t, Math.round(q.k / GEYSER_FLY * 100)]),
       be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
@@ -1990,14 +2051,24 @@ function buildSprites() {
         g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(x - rr2 * 0.3, y - rr2 * 0.1, rr2 * 0.3, rr2 * 0.1, 0, 0, 7); g.fill();
       }
     } else if (curTheme === 'portal') {
-      // night tiles with glowing rune dots and stars
-      for (let k = 0; k < 90; k++) {
-        const x = r2() * W * T, y = r2() * H * TY;
-        g.fillStyle = `rgba(${r2() < 0.5 ? '170,140,255' : '120,220,255'},${0.25 + r2() * 0.4})`;
-        g.beginPath(); g.arc(x, y, 0.8 + r2() * 1.4, 0, 7); g.fill();
+      // cyberpunk deck: neon grid, circuit traces with glowing nodes, a few hazard panels
+      g.lineWidth = 1;
+      for (let y = 0; y <= H; y++) { g.strokeStyle = 'rgba(0,240,255,.22)'; g.beginPath(); g.moveTo(0, y * TY); g.lineTo(W * T, y * TY); g.stroke(); }
+      for (let x = 0; x <= W; x++) { g.strokeStyle = 'rgba(255,0,170,.18)'; g.beginPath(); g.moveTo(x * T, 0); g.lineTo(x * T, H * TY); g.stroke(); }
+      for (let k = 0; k < 34; k++) { // circuit traces
+        let x = Math.floor(r2() * W) * T + T * (0.2 + r2() * 0.6), y = Math.floor(r2() * H) * TY + TY * (0.2 + r2() * 0.6);
+        const col = r2() < 0.55 ? '0,240,255' : '255,60,200';
+        g.strokeStyle = `rgba(${col},.45)`; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x, y);
+        for (let s = 0; s < 3; s++) { if (r2() < 0.5) x += (r2() < 0.5 ? -1 : 1) * T * (0.4 + r2() * 0.8); else y += (r2() < 0.5 ? -1 : 1) * TY * (0.4 + r2() * 0.8); g.lineTo(x, y); }
+        g.stroke();
+        g.fillStyle = `rgba(${col},.9)`; g.shadowColor = `rgba(${col},1)`; g.shadowBlur = 6; g.beginPath(); g.arc(x, y, 1.8, 0, 7); g.fill(); g.shadowBlur = 0;
       }
-      g.strokeStyle = 'rgba(160,130,255,.18)'; g.lineWidth = 1.2;
-      for (let k = 0; k < 14; k++) { const x = r2() * W * T, y = r2() * H * TY, rr2 = T * (0.2 + r2() * 0.25); g.beginPath(); g.ellipse(x, y, rr2, rr2 * 0.6, 0, 0, 7); g.stroke(); }
+      for (let k = 0; k < 6; k++) { // hazard stripes
+        const x = Math.floor(r2() * W) * T, y = Math.floor(r2() * H) * TY;
+        g.save(); g.beginPath(); g.rect(x + 3, y + TY * 0.72, T - 6, TY * 0.18); g.clip();
+        for (let s = -2; s < 12; s++) { g.fillStyle = s % 2 ? 'rgba(255,214,0,.35)' : 'rgba(0,0,0,.35)'; g.beginPath(); g.moveTo(x + s * 6, y + TY); g.lineTo(x + s * 6 + 6, y + TY * 0.6); g.lineTo(x + s * 6 + 12, y + TY * 0.6); g.lineTo(x + s * 6 + 6, y + TY); g.fill(); }
+        g.restore();
+      }
     }
     sprites.floor = c;
   }
@@ -2059,6 +2130,10 @@ function buildSprites() {
     for (let k = 1; k < 3; k++) { g.beginPath(); g.moveTo(1, TY + h * k / 3); g.lineTo(T - 1, TY + h * k / 3); g.stroke(); }
     g.beginPath(); g.moveTo(T / 2, TY); g.lineTo(T / 2, TY + h / 3); g.moveTo(T / 4, TY + h / 3); g.lineTo(T / 4, TY + 2 * h / 3); g.moveTo(3 * T / 4, TY + h / 3); g.lineTo(3 * T / 4, TY + 2 * h / 3); g.stroke();
     g.fillStyle = 'rgba(255,255,255,.18)'; rr(g, T * 0.12, TY * 0.12, T * 0.76, TY * 0.18, 3); g.fill();
+    if (TH.cyber) { // neon trims
+      g.shadowColor = '#ff2bd6'; g.shadowBlur = 8; g.fillStyle = '#ff4fe0'; g.fillRect(2, TY + h * 0.45, T - 4, Math.max(1.5, h * 0.07));
+      g.shadowColor = '#00f0ff'; g.fillStyle = '#5ff4ff'; g.fillRect(T * 0.15, TY * 0.48, T * 0.7, 1.5); g.shadowBlur = 0;
+    }
     sprites.wall = c; sprites.wallH = h;
   }
   // pillar (round stone)
@@ -2074,6 +2149,12 @@ function buildSprites() {
     const tg = g.createRadialGradient(cx - rx * 0.3, topY - ry * 0.3, 1, cx, topY, rx);
     tg.addColorStop(0, TP[3]); tg.addColorStop(1, TP[4]);
     g.fillStyle = tg; g.beginPath(); g.ellipse(cx, topY, rx, ry, 0, 0, Math.PI * 2); g.fill();
+    if ((THEMES[curTheme] || {}).cyber) { // glowing bands round a server column
+      g.shadowColor = '#00f0ff'; g.shadowBlur = 8; g.strokeStyle = '#5ff4ff'; g.lineWidth = Math.max(1.5, T * 0.04);
+      for (const f of [0.35, 0.7]) { g.beginPath(); g.ellipse(cx, topY + h * f, rx, ry, 0, 0, Math.PI); g.stroke(); }
+      g.shadowColor = '#ff2bd6'; g.fillStyle = '#ff4fe0'; for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(cx - rx * 0.4 + k * rx * 0.4, topY + h * 0.52, 1.6, 0, 7); g.fill(); }
+      g.shadowBlur = 0;
+    }
     sprites.pillar = c; sprites.pillarH = h; sprites.pillarOff = TY / 2 - ry - 1;
   }
   // crate
@@ -2089,19 +2170,30 @@ function buildSprites() {
     g.strokeStyle = 'rgba(110,60,20,.55)'; g.lineWidth = 1.2;
     for (let k = 1; k < 4; k++) { const yy = m + (TY - m) * k / 4; g.beginPath(); g.moveTo(m + 3, yy); g.lineTo(T - m - 3, yy); g.stroke(); }
     g.strokeStyle = '#6e3c14'; g.lineWidth = 2; rr(g, m, m, T - 2 * m, TY - m, 4); g.stroke();
+    if ((THEMES[curTheme] || {}).cyber) { // data crate: dark alloy with neon seams
+      g.clearRect(0, 0, c.width, c.height);
+      g.fillStyle = '#141a2e'; rr(g, m, TY * 0.5, T - 2 * m, h + TY * 0.5 - m, 4); g.fill();
+      const f2 = g.createLinearGradient(0, TY, 0, TY + h); f2.addColorStop(0, '#2a3354'); f2.addColorStop(1, '#171d33');
+      g.fillStyle = f2; g.fillRect(m + 2, TY, T - 2 * m - 4, h - m - 2);
+      const t2 = g.createLinearGradient(0, 0, 0, TY); t2.addColorStop(0, '#3b4775'); t2.addColorStop(1, '#262f52');
+      g.fillStyle = t2; rr(g, m, m, T - 2 * m, TY - m, 4); g.fill();
+      g.shadowColor = '#00f0ff'; g.shadowBlur = 6; g.strokeStyle = '#5ff4ff'; g.lineWidth = 1.5; rr(g, m + 2, m + 2, T - 2 * m - 4, TY - m - 4, 3); g.stroke();
+      g.shadowColor = '#ff2bd6'; g.strokeStyle = '#ff4fe0'; g.beginPath(); g.moveTo(m + 4, TY + h * 0.45); g.lineTo(T - m - 4, TY + h * 0.45); g.stroke();
+      g.shadowBlur = 0; g.fillStyle = '#ffd400'; g.fillRect(T / 2 - 4, TY * 0.4, 8, 3);
+    }
     sprites.crate = c; sprites.crateH = h;
   }
 }
 const THEMES = {
   grass: { floorA: '#5cbf5a', floorB: '#68cc63', grass: true, wallTop: ['#9fb0c8', '#8395b0'], wallFront: '#5b6b85', pillar: ['#6f7f99', '#a9b8cf', '#55637a', '#dfe8f5', '#93a4bd'] },
   storm: { floorA: '#7b8599', floorB: '#858fa3', grass: false, wallTop: ['#68718a', '#565f78'], wallFront: '#3b4257', pillar: ['#4a5168', '#7b849e', '#3a4055', '#b9c2d8', '#6b748e'] },
-  portal: { floorA: '#3a3163', floorB: '#443a72', grass: false, wallTop: ['#8f7bd0', '#6f5bb0'], wallFront: '#3f2f78', pillar: ['#5a45a0', '#9c88e0', '#47358a', '#e1d8ff', '#8f7bd0'] },
+  portal: { floorA: '#0c1325', floorB: '#101a31', grass: false, cyber: true, wallTop: ['#2c3656', '#1d2540'], wallFront: '#111729', pillar: ['#161d33', '#3b4a78', '#10162a', '#7ff6ff', '#1a7d9c'] },
 };
 const MAP_INFO = {
   classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng 2 con 🐝 ong bay lượn trên sân, thỉnh thoảng chui vào bụi rồi hiện ra chỗ khác: lại gần 2 ô là bị đuổi chích, choáng 2 giây.' },
   river: { name: '🌊 Bờ sông', theme: 'grass', desc: 'Sông chữ thập uốn lượn chia sân thành 4 khu, mỗi nhánh có 1 cây cầu. Thỉnh thoảng 🐟 cá nhô lên phun nước vào người chơi hoặc vài ô bất kỳ (vòng xanh là chỗ nước rơi): trúng nước là đi cực chậm 4 giây.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông. Giữa sân có 💤 Mây Khổng Lồ đang ngủ: tia nổ trúng nó là nó giật mình, giật sét 5 ô (ô vàng nhấp nháy), ai đứng trong ô là dính như trúng bom.' },
-  portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
+  portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: 'Thành phố Cyberpunk với 4 cổng dịch chuyển (người bước vào bị đưa tới chỗ ngẫu nhiên). Càng về sau càng mở thêm 🌌 vết nứt không gian: hai vết cùng màu nối nhau, người đi qua lại được. Tia nổ chui vào cổng/vết nứt sẽ phun ra ở cổng bên kia, bom bị đá cũng trượt xuyên qua.' },
 };
 let curTheme = 'grass';
 function SIM_RNG(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
@@ -2160,12 +2252,12 @@ function spawnDebris(x, y, color, n = 8, up = 1) {
 function onNewState(S, prev) {
   const now = performance.now() / 1000;
   const rk = S.rk;
-  if (rk !== R.roundKey) { R.roundKey = rk; R.seenEv = 0; R.bush.fill(0); R.base.fill(''); R.rustle.fill(0); R.lastCell = [-1, -1, -1, -1]; R.disp = [null, null, null, null]; R.deadAt.fill(0); R.trapAt.fill(0); R.falling.clear(); R.particles.length = 0; prev = null; }
+  if (rk !== R.roundKey) { R.roundKey = rk; R.seenEv = 0; R.bush.fill(0); R.base.fill(''); R.rustle.fill(0); R.lastCell = new Array(MAXP).fill(-1); R.disp = new Array(MAXP).fill(null); R.deadAt.fill(0); R.trapAt.fill(0); R.falling.clear(); R.particles.length = 0; prev = null; }
   for (let i = 0; i < W * H; i++) {
     const c = S.m[i];
     if (c === '*') continue;
     R.bush[i] = c === 'g' ? 1 : 0;
-    R.base[i] = (c === '~' || c === '=' || c === 'o') ? c : '';
+    R.base[i] = (c === '~' || c === '=' || c === 'o' || c === 'r') ? c : '';
   }
   const th = (MAP_INFO[S.mp] || MAP_INFO.classic).theme;
   if (th !== curTheme) { curTheme = th; buildSprites(); }
@@ -2228,6 +2320,13 @@ function handleEvent(e, S) {
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
+  if (e.k === 'rift') {
+    const a = Math.floor(e.b / 1000), b = e.b % 1000;
+    for (const i of [a, b]) { spawnDebris(i % W, (i / W) | 0, '#ff2bd6', 14); R.flashes.push({ x: i % W, y: (i / W) | 0, t: now, c: '#00f0ff' }); }
+    [220, 330, 495, 990].forEach((f, k) => tone(f, f * 0.5, 0.18, 'sawtooth', 0.05, k * 0.06)); R.shake = Math.max(R.shake || 0, 0.25);
+    addFeed('🌌 Một vết nứt không gian vừa mở! Hai vết cùng màu nối với nhau: người và bom đi qua được.', 'sys'); return;
+  }
+  if (e.k === 'btele') { const to = e.b % 1000; spawnDebris(to % W, (to / W) | 0, '#00f0ff', 10); tone(500, 1200, 0.12, 'square', 0.05); return; }
   if (e.k === 'giantWake') { tone(120, 380, 0.35, 'sawtooth', 0.09); tone(600, 900, 0.15, 'square', 0.05, 0.25); addFeed(`⚡ ${e.a >= 0 ? seatName(S, e.a) + ' làm' : 'Bom làm'} Mây Khổng Lồ tỉnh giấc! Nó sắp giật sét 5 ô!`, 'sys'); return; }
   if (e.k === 'giantSleep') return;
   if (e.k === 'geyser') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#9fd8ff', 14); noise(0.5, 0.12, 1500); return; }
@@ -2347,6 +2446,7 @@ function drawBoard(S, dt, now) {
     const x = i % W, y = (i / W) | 0;
     if (b === '=') drawBridge(x, y);
     if (b === 'o') drawPortal(x, y, now, i);
+    if (b === 'r') drawRift(S, x, y, now, i);
   }
   // cells the giant cloud is about to strike
   if (S.gi && S.gi[4] === 1) for (const i of S.gi[6] || []) {
@@ -2543,6 +2643,22 @@ function drawBridge(x, y) {
   ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = 1.2;
   for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(x0, y0 + h * k / 5); ctx.lineTo(x0 + w, y0 + h * k / 5); ctx.stroke(); }
   ctx.fillStyle = '#6e3f17'; ctx.fillRect(x0 - 3, y0, 4, h); ctx.fillRect(x0 + w - 1, y0, 4, h);
+}
+// a space rift: a jagged tear in the floor, colour shared with its linked twin
+const RIFT_COLS = ['#ff2bd6', '#00f0ff', '#ffe600', '#7dff5a', '#ff7a2c', '#b388ff'];
+function drawRift(S, x, y, now, i) {
+  const k = (S.rf || []).findIndex(r => r[0] === i || r[1] === i), col = RIFT_COLS[(k < 0 ? 0 : k) % RIFT_COLS.length];
+  const cx = SX(x), cy = SY(y), seed = i * 7.31;
+  const glow = ctx.createRadialGradient(cx, cy, 1, cx, cy, T * 0.55); glow.addColorStop(0, col); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.save(); ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now * 6 + seed); ctx.fillStyle = glow; ctx.beginPath(); ctx.ellipse(cx, cy, T * 0.55, TY * 0.5, 0, 0, 7); ctx.fill(); ctx.restore();
+  // the tear itself: a dark jagged slit with a bright rim
+  const pts = []; for (let s = 0; s <= 8; s++) { const u = s / 8, jit = (Math.sin(seed + s * 2.1 + Math.floor(now * 12) * 0.7) * 0.5) * T * 0.12; pts.push([cx + (u - 0.5) * T * 0.8 + jit * 0.3, cy + (u - 0.5) * TY * 0.5 + jit]); }
+  for (const [lw, c2] of [[Math.max(7, T * 0.2), col], [Math.max(3, T * 0.08), '#ffffff'], [Math.max(1.5, T * 0.035), '#05010f']]) {
+    ctx.strokeStyle = c2; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach(([px, py], s) => s ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke();
+  }
+  // glitch slivers
+  if (Math.floor(now * 9 + seed) % 3 === 0) { ctx.fillStyle = col; for (let s = 0; s < 3; s++) ctx.fillRect(cx + Math.sin(seed + s * 3 + now * 30) * T * 0.4, cy + (s - 1) * TY * 0.18, T * 0.18, 2); }
+  if (Math.random() < 0.12) R.particles.push({ x, y, z: 0.1, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.4, vz: 1.4 + Math.random(), life: 0.5, c: col, s: 0.04 });
 }
 function drawPortal(x, y, now, i) {
   const cx = SX(x), cy = SY(y), cols = ['#ff7ad9', '#7ad7ff', '#ffd36b', '#8dff8a'], col = cols[[[3, 3], [W - 4, 3], [3, H - 4], [W - 4, H - 4]].findIndex(([a, b]) => a === x && b === y)] || '#b48cff';
@@ -3659,6 +3775,7 @@ const AUTO = {
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
   giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
   soak: (a, b) => [`Con cá phun nước trúng ${b}, giờ đi chậm như rùa!`, `Ào! ${b} ướt sũng vì cá phun, 4 giây lết từng bước!`],
+  rift: () => [`Không gian nứt toác! Một cặp vết nứt mới vừa mở, ai sẽ tận dụng được nó?`, `Vết nứt không gian xuất hiện! Coi chừng bom bay xuyên qua đấy!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],

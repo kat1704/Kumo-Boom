@@ -156,7 +156,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, geysers: [], geyT: 3 + rand() * 2,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, rifts: [], nextRift: 22, geysers: [], geyT: 3 + rand() * 2,
       giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
@@ -295,6 +295,17 @@ const SIM = (() => {
         const step = Math.min(dist, 0.1); dist -= step;
         const nx = b.x + b.vx, ny = b.y + b.vy;
         const along = b.vx ? b.fx - b.x : b.fy - b.y, sgn = b.vx || b.vy;
+        if (sgn * along >= -1e-6 && nx >= 0 && ny >= 0 && nx < W && ny < H && isGate(g.map[idx(nx, ny)])) { // slide into a gate, come out of the linked one
+          const gi = idx(nx, ny), exits = gateExits(g, gi), ex = exits.length ? exits[(Math.random() * exits.length) | 0] : -1;
+          const ox = ex % W + b.vx, oy = ((ex / W) | 0) + b.vy;
+          if (ex >= 0 && passableForBomb(g, b, ox, oy)) {
+            g.bombAt[idx(b.x, b.y)] = null; b.x = ox; b.y = oy; b.fx = ox; b.fy = oy; g.bombAt[idx(ox, oy)] = b;
+            for (const q of g.players) if (q && q.st !== 2 && Math.abs(q.x - ox) < 0.95 && Math.abs(q.y - oy) < 0.95) q.ghost.add(b.id);
+            ev(g, 'btele', -1, gi * 1000 + ex);
+            continue;
+          }
+          b.fx = b.x; b.fy = b.y; b.vx = 0; b.vy = 0; break;
+        }
         if (!passableForBomb(g, b, nx, ny) && sgn * along >= -1e-6) {
           b.fx = b.x; b.fy = b.y; b.vx = 0; b.vy = 0; break; // stop at cell center
         }
@@ -304,6 +315,37 @@ const SIM = (() => {
         }
       }
     }
+  }
+
+  // ---- gates: the 4 portals ('o') are linked to each other, space rifts ('r') come in linked pairs
+  const isGate = c => c === 'o' || c === 'r';
+  function gateExits(g, i) {
+    if (g.map[i] === 'r') { const r = g.rifts.find(r => r.a === i || r.b === i); if (!r) return []; const e = r.a === i ? r.b : r.a; return g.map[e] === 'r' ? [e] : []; }
+    if (g.map[i] === 'o') return PORTALS.map(([x, y]) => idx(x, y)).filter(j => j !== i && g.map[j] === 'o');
+    return [];
+  }
+  // rifts tear open as the round goes on: a new linked pair every ~20s, up to 6 pairs
+  function riftStep(g) {
+    const el = g.roundTime - g.timeLeft;
+    if (el < g.nextRift || g.rifts.length >= 6) return;
+    g.nextRift = el + Math.max(12, 22 - g.rifts.length * 2);
+    const gates = []; for (let i = 0; i < W * H; i++) if (isGate(g.map[i])) gates.push(i);
+    const ok = i => {
+      const c = g.map[i]; if (!(c === '.' || c === 'g') || g.bombAt[i] || g.items[i] || g.flames[i] > 0) return false;
+      const x = i % W, y = (i / W) | 0;
+      if (nearSpawn(x, y)) return false;
+      if (gates.some(j => Math.abs(j % W - x) + Math.abs(((j / W) | 0) - y) < 3)) return false;
+      if (g.players.some(p => p && p.st !== 2 && Math.abs(p.x - x) < 1 && Math.abs(p.y - y) < 1)) return false;
+      return true;
+    };
+    const cand = []; for (let i = 0; i < W * H; i++) if (ok(i)) cand.push(i);
+    if (cand.length < 2) return;
+    const a = cand[(Math.random() * cand.length) | 0];
+    const far = cand.filter(i => Math.abs(i % W - a % W) + Math.abs(((i / W) | 0) - ((a / W) | 0)) >= Math.max(6, (W + H) / 3));
+    if (!far.length) return;
+    const b = far[(Math.random() * far.length) | 0];
+    g.map[a] = 'r'; g.map[b] = 'r'; g.rifts.push({ a, b });
+    ev(g, 'rift', -1, a * 1000 + b);
   }
 
   function teleport(g, p, from) {
@@ -484,17 +526,24 @@ const SIM = (() => {
   }
 
   function blastCells(g, bx, by, fire, hit) {
-    const out = [[bx, by]];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      for (let k = 1; k <= fire; k++) {
-        const x = bx + dx * k, y = by + dy * k;
-        const c = g.map[idx(x, y)];
+    const out = [[bx, by]], used = new Set();
+    const ray = (x0, y0, dx, dy, n) => {
+      for (let k = 1; k <= n; k++) {
+        const x = x0 + dx * k, y = y0 + dy * k, i = idx(x, y);
+        if (x < 0 || y < 0 || x >= W || y >= H) break;
+        const c = g.map[i];
         if (c === 'C') { if (hit) hit.giant = true; break; }
         if (c === '#') break;
         out.push([x, y]);
         if (c === 'x') break;
+        if (isGate(c) && !used.has(i)) { // the blast goes in one gate and keeps going out of the linked one(s)
+          used.add(i);
+          for (const e of gateExits(g, i)) { if (used.has(e)) continue; used.add(e); out.push([e % W, (e / W) | 0]); ray(e % W, (e / W) | 0, dx, dy, n - k); }
+          break;
+        }
       }
-    }
+    };
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) ray(bx, by, dx, dy, fire);
     return out;
   }
 
@@ -577,6 +626,7 @@ const SIM = (() => {
       g.sd.acc -= SUDDEN_STEP;
       const i = SPIRAL[g.sd.k++];
       if (g.map[i] === '#' || g.map[i] === 'C') continue;
+      if (g.map[i] === 'r') { const k = g.rifts.findIndex(r => r.a === i || r.b === i); if (k >= 0) { const r = g.rifts[k], o = r.a === i ? r.b : r.a; if (g.map[o] === 'r') g.map[o] = '.'; g.rifts.splice(k, 1); } }
       g.map[i] = '#'; g.items[i] = null; g.hid[i] = null; g.drops[i] = null; g.flames[i] = 0;
       const b = g.bombAt[i];
       if (b) { g.bombs.splice(g.bombs.indexOf(b), 1); g.bombAt[i] = null; }
@@ -640,12 +690,22 @@ const SIM = (() => {
       f.fx = f.x0 + (f.tx - f.x0) * u; f.fy = f.y0 + (f.ty - f.y0) * u; f.z = 2 * (1 - u) + 4 * 0.8 * u * (1 - u);
       if (u >= 1) { const i = idx(f.tx, f.ty); if (isFloor(g.map[i]) && !g.bombAt[i]) g.items[i] = f.k; g.flyItems.splice(k, 1); }
     }
-    // portals
-    if (g.mapId === 'portal') for (const p of g.players) {
-      if (!p || p.st !== 0) continue;
-      if (p.tpCd > 0) { p.tpCd -= dt; continue; }
-      const cx = Math.round(p.x), cy = Math.round(p.y);
-      if (g.map[idx(cx, cy)] === 'o' && Math.abs(p.x - cx) < 0.35 && Math.abs(p.y - cy) < 0.35) teleport(g, p, idx(cx, cy));
+    // portals and space rifts
+    if (g.mapId === 'portal') {
+      riftStep(g);
+      for (const p of g.players) {
+        if (!p || p.st !== 0) continue;
+        const cx = Math.round(p.x), cy = Math.round(p.y), cell = idx(cx, cy);
+        if (p.gateLock !== undefined && p.gateLock !== cell) p.gateLock = -1; // stepped off the rift we came out of
+        if (p.tpCd > 0) { p.tpCd -= dt; continue; }
+        if (Math.abs(p.x - cx) >= 0.35 || Math.abs(p.y - cy) >= 0.35 || cell === p.gateLock) continue;
+        if (g.map[cell] === 'o') teleport(g, p, cell);
+        else if (g.map[cell] === 'r') {
+          const ex = gateExits(g, cell)[0]; if (ex === undefined) continue;
+          p.x = ex % W; p.y = (ex / W) | 0; p.ghost.clear(); p.lockT = 0.7; p.gateLock = ex; p.tpCd = 0.3;
+          ev(g, 'tele', p.seat, cell * 1000 + ex);
+        }
+      }
     }
     // bombs
     moveBombs(g, dt);
@@ -876,6 +936,7 @@ const SIM = (() => {
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
       p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10), Math.ceil((p.wet || 0) * 10)] : 0),
+      rf: (g.rifts || []).map(r => [r.a, r.b]),
       gi: g.giant ? [g.giant.x0, g.giant.y0, g.giant.w, g.giant.h, g.giant.st, Math.round(g.giant.t * 10), g.giant.warn] : 0,
       gy: (g.geysers || []).map(q => [q.s, q.t, Math.round(q.k / GEYSER_FLY * 100)]),
       be: (g.bees || []).filter(b => b.st !== 3).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.st === 1 ? 1 : 0, b.id]),
@@ -913,6 +974,7 @@ const AUTO = {
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
   giantWake: (a) => [`${a} vừa đánh thức Mây Khổng Lồ! Sét sắp đánh, chạy mau!`, `Ầm! Mây Khổng Lồ tỉnh giấc, ai đứng trong ô vàng thì nguy rồi!`],
   soak: (a, b) => [`Con cá phun nước trúng ${b}, giờ đi chậm như rùa!`, `Ào! ${b} ướt sũng vì cá phun, 4 giây lết từng bước!`],
+  rift: () => [`Không gian nứt toác! Một cặp vết nứt mới vừa mở, ai sẽ tận dụng được nó?`, `Vết nứt không gian xuất hiện! Coi chừng bom bay xuyên qua đấy!`],
   sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],

@@ -132,6 +132,14 @@ kbd{background:#30333a;border-radius:5px;padding:0 5px;font-family:inherit;font-
 #bPause.paused{background:linear-gradient(180deg,#7ee08a,#2fae6b);color:#062a14}
 #bPause:disabled{opacity:.4}
 #bFull{width:46px;height:46px;padding:0;font-size:24px;border-radius:12px;background:linear-gradient(180deg,#6b6f78,#3e4148);color:#ffffff;flex:none;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+#charBox{left:50%;top:50%;transform:translate(-50%,-50%);width:min(640px,calc(100% - 24px));max-height:calc(100% - 40px);overflow:auto;padding:14px;z-index:30;display:none}
+#charBox .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+#charBox .cgrid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;background:#2a2c32;border:2px solid transparent;border-radius:12px}
+#charBox .cgrid button.on{border-color:#ffd36b;background:#3a3624}
+#charBox .cgrid img{height:96px;image-rendering:pixelated}
+#charBox .cgrid .cauto{font-size:54px;height:96px;display:grid;place-items:center}
+#charBox .cgrid b{font-size:13px;line-height:1.15;text-align:center}
+#charBox .chint{font-size:13px;color:var(--mut);margin-top:10px}
 body.noguide #keyHint,body.noguide .mapinfo,body.noguide .iguide,body.noguide #statsSect,body.noguide #stats{display:none!important}
 #bGuide.off{opacity:.55}
 #bFull:hover{background:linear-gradient(180deg,#7d818b,#4b4f57)}
@@ -319,6 +327,7 @@ body.noguide #keyHint,body.noguide .mapinfo,body.noguide .iguide,body.noguide #s
     <button id="bHost" title="Làm host">🎙️ Host</button>
     <button id="bPanel" style="display:none" title="Bảng điều khiển host">⚙️</button>
     <button id="bStats" title="Bảng thông số item (Tab)">📊</button>
+    <button id="bChar" title="Chọn nhân vật">🧑</button>
     <button id="bGuide" title="Ẩn / hiện các bảng hướng dẫn">📖</button>
     <button id="bGfx" title="Chất lượng đồ họa">✨ Cao</button>
     <button id="bHelp" title="Hướng dẫn nút bấm (H)">❓</button>
@@ -397,6 +406,7 @@ body.noguide #keyHint,body.noguide .mapinfo,body.noguide .iguide,body.noguide #s
     <p>Đặt bóng nước, nhốt đối thủ vào bong bóng, chọc vỡ là thắng!</p>
     <label>Tên của bạn</label>
     <input id="sName" maxlength="16" placeholder="VD: Anh Ba">
+    <a href="#" id="sChar" style="display:inline-block;margin-top:6px;color:#ffd36b;font-size:14px">🧑 Chọn nhân vật</a>
     <label>Mã phòng (bạn bè nhập cùng mã để vào chung)</label>
     <input id="sRoom" maxlength="20" placeholder="san-1">
     <div class="btns">
@@ -3049,7 +3059,7 @@ function drawPlayer(S, s, now) {
     if (Math.random() < 0.3) R.particles.push({ x: d.x + (Math.random() - 0.5) * 0.7, y: d.y, z: Math.random() * 0.8, vx: 0, vy: 0, vz: 2, life: 0.5, c: '#ffe14d', s: 0.06 });
   }
   // sprite character (user-provided pixel art), faces right by default
-  const spr = SPR[s];
+  const spr = SPR[charOf(S, s)];
   // source art faces left: no flip when going left, mirror when going right
   if (dir === 2) R.face[s] = 1; else if (dir === 3) R.face[s] = -1;
   const face = R.face[s] || (s === 1 || s === 2 ? 1 : -1);
@@ -3497,10 +3507,10 @@ function updateCenter(S, now) {
       let t = '🤝 Hoà!';
       if (S.wn >= 0) {
         const winners = S.md === 'team' ? seatIdx(S).filter(i => S.p?.[i] && S.p[i][11] === S.wn) : [S.wn];
-        t = (S.md === 'team' ? `🏆 ${TEAM_NAME[S.wn]} thắng!` : '🏆 Chiến thắng!') + `<div class="winrow">${winners.map(i => `<div class="wincard" style="--c:${COLORS[i]}">${SPR[i] ? `<img src="${SPR[i].src}" alt="">` : ''}<div class="wcn">${CHAR_NAMES[i]}</div><div class="wpn">${esc(seatName(S, i))}</div></div>`).join('')}</div>`;
+        t = (S.md === 'team' ? `🏆 ${TEAM_NAME[S.wn]} thắng!` : '🏆 Chiến thắng!') + `<div class="winrow">${winners.map(i => `<div class="wincard" style="--c:${COLORS[i]}">${SPR[charOf(S, i)] ? `<img src="${SPR[charOf(S, i)].src}" alt="">` : ''}<div class="wcn">${CHAR_NAMES[charOf(S, i)]}</div><div class="wpn">${esc(seatName(S, i))}</div></div>`).join('')}</div>`;
       }
       const rows = seatIdx(S).filter(i => S.s?.[i]).sort((a, b) => (S.sc?.[b] || 0) - (S.sc?.[a] || 0));
-      const board = `<div class="sboard">${rows.map((i, k) => `<div class="sbr"><span>${(['🥇', '🥈', '🥉'][k] || (k + 1) + '.')}</span>${SPR[i] ? `<img class="sbi" src="${SPR[i].src}" alt="">` : `<span class="sd" style="background:${COLORS[i]}"></span>`}<b>${esc(seatName(S, i))}<small> · ${CHAR_NAMES[i]}</small></b><i>💥${S.p?.[i]?.[8] ?? 0}${S.wn >= 0 && S.p?.[i] && S.p[i][11] === S.wn ? ' · 🏆 +2' : ''}</i><em>⭐ ${S.sc?.[i] || 0}</em></div>`).join('')}<div class="sbn">Hạ gục +1 điểm · Thắng ván +2 điểm</div></div>`;
+      const board = `<div class="sboard">${rows.map((i, k) => `<div class="sbr"><span>${(['🥇', '🥈', '🥉'][k] || (k + 1) + '.')}</span>${SPR[charOf(S, i)] ? `<img class="sbi" src="${SPR[charOf(S, i)].src}" alt="">` : `<span class="sd" style="background:${COLORS[i]}"></span>`}<b>${esc(seatName(S, i))}<small> · ${CHAR_NAMES[charOf(S, i)]}</small></b><i>💥${S.p?.[i]?.[8] ?? 0}${S.wn >= 0 && S.p?.[i] && S.p[i][11] === S.wn ? ' · 🏆 +2' : ''}</i><em>⭐ ${S.sc?.[i] || 0}</em></div>`).join('')}<div class="sbn">Hạ gục +1 điểm · Thắng ván +2 điểm</div></div>`;
       h = `<div class="res">${t}</div>${board}<div class="sm">${S.auto ? 'Ván mới sau ' + Math.max(0, Math.ceil(S.t)) + ' giây…' : 'Chờ host mở ván mới'}</div>`;
     }
   }
@@ -3600,6 +3610,8 @@ async function goLandscape() {
 const guideOff = () => document.body.classList.contains('noguide');
 function syncGuide() { $('bGuide').classList.toggle('off', guideOff()); $('bGuide').title = guideOff() ? 'Hiện lại các bảng hướng dẫn' : 'Ẩn các bảng hướng dẫn'; }
 try { if (localStorage.getItem('boom.noguide') === '1') document.body.classList.add('noguide'); } catch (e) { /* ignore */ }
+$('bChar').onclick = () => openCharPicker();
+if ($('sChar')) $('sChar').onclick = e => { e.preventDefault(); openCharPicker(); };
 $('bGuide').onclick = () => {
   document.body.classList.toggle('noguide');
   try { localStorage.setItem('boom.noguide', guideOff() ? '1' : '0'); } catch (e) { /* ignore */ }
@@ -3696,6 +3708,39 @@ function togglePause() {
 $('bPause').onclick = () => { ac(); togglePause(); };
 
 // ---------- starting trait ----------
+// ---- character choice: each player can pick which character they play as (-1 = the seat's own)
+let myChar = (() => { const v = parseInt(store.get('char', '-1'), 10); return Number.isFinite(v) && v >= -1 && v < 8 ? v : -1; })();
+function peerChar(peer) {
+  if (peer === app.myPeer || app.mode !== 'online') return myChar;
+  const v = app.peers.find(p => p.peer === peer)?.presence?.ch;
+  return Number.isInteger(v) && v >= -1 && v < 8 ? v : -1;
+}
+function charOf(S, s) {
+  const v = S?.s?.[s]?.[4];
+  if (Number.isInteger(v) && v >= 0 && v < SPR.length) return v;
+  return s < SPR.length ? s : s % 5;
+}
+function setChar(k) {
+  myChar = k; store.set('char', String(k));
+  if (app.nroom) app.nroom.presence({ ch: k }).catch(() => {});
+  renderCharPicker();
+}
+function renderCharPicker() {
+  const box = $('charBox'); if (!box || box.style.display === 'none') return;
+  const opts = [-1, ...SPR.map((_, i) => i)];
+  box.querySelector('.cgrid').innerHTML = opts.map(k => `<button data-k="${k}" class="${k === myChar ? 'on' : ''}">${k < 0 ? '<span class="cauto">🎲</span>' : `<img src="${SPR[k].src}" alt="">`}<b>${k < 0 ? 'Theo ghế' : CHAR_NAMES[k]}</b></button>`).join('');
+  box.querySelectorAll('.cgrid button').forEach(b => b.onclick = () => { setChar(+b.dataset.k); toast('Đã chọn ' + (myChar < 0 ? 'nhân vật theo ghế' : CHAR_NAMES[myChar])); });
+}
+function openCharPicker() {
+  let box = $('charBox');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'charBox'; box.className = 'panel';
+    box.innerHTML = `<div class="row" style="justify-content:space-between;margin:0 0 8px"><h3 style="margin:0">🧑 Chọn nhân vật</h3><button id="charClose">✕</button></div><div class="cgrid"></div><div class="chint">Ai cũng chọn được, trùng nhau cũng không sao (màu vòng chân theo ghế). "Theo ghế" = dùng nhân vật mặc định của ghế bạn ngồi.</div>`;
+    document.body.appendChild(box);
+    box.querySelector('#charClose').onclick = () => { box.style.display = 'none'; };
+  }
+  box.style.display = 'block'; renderCharPicker();
+}
 let myTrait = TRAIT_KEYS.includes(store.get('trait', '')) ? store.get('trait', '') : 'b';
 function traitIcon(k) { return k === 'b' || k === 'f' ? iconHTML(k) : ITEM_ICON[k]; }
 function renderTraitBar() {
@@ -3941,7 +3986,7 @@ function hostTick(dt) {
   }
   host.tick++;
   const snap = SIM.encode(host.g);
-  snap.s = host.seats.map((s, i) => s.type === 'empty' ? 0 : [s.type === 'bot' ? 1 : 2, s.name, s.peer || '', host.g.players[i]?.trait || '']);
+  snap.s = host.seats.map((s, i) => s.type === 'empty' ? 0 : [s.type === 'bot' ? 1 : 2, s.name, s.peer || '', host.g.players[i]?.trait || '', s.type === 'human' ? peerChar(s.peer) : -1]);
   snap.rk = host.rk; snap.auto = host.auto ? 1 : 0; snap.pz = host.paused ? 1 : 0;
   // auto commentary
   for (const e of snap.e) if (e.i > host.seenEv) { host.seenEv = e.i; if (host.autoCm) queueAutoComment(e, snap); }
@@ -4040,7 +4085,7 @@ function renderHostPanel(force) {
     const d = document.createElement('div'); d.className = 'sc drop' + (host.pick ? ' armed' : '');
     d.style.setProperty('--c', COLORS[i]);
     const head = document.createElement('div'); head.className = 'sch';
-    head.innerHTML = `<span class="dot" style="background:${COLORS[i]}"></span><b>Ghế ${i + 1}</b><i>${CHAR_NAMES[i]}</i>`;
+    head.innerHTML = `<span class="dot" style="background:${COLORS[i]}"></span><b>Ghế ${i + 1}</b><i>${CHAR_NAMES[charOf(app.S, i)]}</i>`;
     d.appendChild(head);
     const row = document.createElement('div'); row.className = 'scr';
     if (s.type === 'human') {
@@ -4213,7 +4258,7 @@ async function enterRoom(role, wantHost, embedRoomName) {
     if (!msg.data || typeof msg.data !== 'object' || !validDims(msg.data)) return;
     setState(msg.data);
   });
-  await app.nroom.presence({ n: app.name, want: role, tr: myTrait, inp: { dx: 0, dy: 0, b: 0, nd: 0 } }).catch(() => {});
+  await app.nroom.presence({ n: app.name, want: role, tr: myTrait, ch: myChar, inp: { dx: 0, dy: 0, b: 0, nd: 0 } }).catch(() => {});
   $('start').style.display = 'none'; firstHelp();
   $('roomTag').textContent = EMBED ? 'Kumo Boardgame' : 'Phòng: ' + app.code;
   if (IS_WEB) { try { history.replaceState(null, '', '#' + app.code); } catch (e) { /* ignore */ } $('bInvite').style.display = ''; showInvite(); addFeed('🔗 Link mời: ' + inviteLink() + ' — bạn bè mở link này là vào đúng phòng.', 'sys'); }

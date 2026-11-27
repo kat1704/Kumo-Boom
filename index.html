@@ -465,7 +465,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
       <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
-      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (cổ điển) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
+      <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 🐝 ong núp trong bụi chích choáng 2 giây) · 🌊 Sông ngã tư (sông chữ thập chia 4 vùng, mỗi nhánh 1 cây cầu) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão) · 🌀 Cổng không gian (4 cổng dịch chuyển tới chỗ ngẫu nhiên). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Phách thần (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
   </div>
@@ -556,7 +556,10 @@ const SIM = (() => {
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';
       else if (mapId === 'river' && ((BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) || (VBRIDGES.includes(y) && Math.abs(x - RIVER_X) === 1))) map[i] = '.'; // bridge heads stay open
-      else { const r = rand(); if (r < 0.62) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < 0.75) map[i] = 'g'; }
+      else {
+        const r = rand(), crate = mapId === 'classic' ? 0.5 : 0.62, grass = mapId === 'classic' ? 0.88 : 0.75; // the meadow is thick with bushes
+        if (r < crate) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < grass) map[i] = 'g';
+      }
     }
     const players = [], N = Math.max(2, Math.min(8, (cfg.players || []).length || 4));
     const pad = a => { const o = (a || []).slice(0, N); while (o.length < N) o.push(0); return o; };
@@ -567,7 +570,7 @@ const SIM = (() => {
         seat: s, name: pc.name, bot: !!pc.bot,
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
-        st: 0, trapT: 0, inv: 0, moving: 0,
+        st: 0, trapT: 0, inv: 0, moving: 0, stun: 0,
         maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
@@ -575,7 +578,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand),
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeT: 6 + rand() * 3, beeId: 0,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
@@ -737,6 +740,58 @@ const SIM = (() => {
     const to = pool[(g.rand() * pool.length) | 0];
     p.x = to % W; p.y = (to / W) | 0; p.ghost.clear(); p.tpCd = 1.2;
     ev(g, 'tele', p.seat, from * 1000 + to);
+  }
+
+  // ---- bees hiding in the meadow's bushes: one darts out, stings a nearby player (2s daze) and hides again
+  const BEE_SPEED = 4.6, BEE_BACK = 5.5, BEE_LIFE = 3.2, STUN_TIME = 2;
+  function beesStep(g, dt) {
+    const alive = g.players.filter(p => p && p.st === 0);
+    g.beeT -= dt;
+    if (g.beeT <= 0) {
+      g.beeT = 3.5 + Math.random() * 4.5;
+      if (g.bees.length < Math.max(2, Math.ceil(alive.length / 2))) {
+        const cands = [];
+        for (let i = 0; i < W * H; i++) {
+          if (g.map[i] !== 'g' || g.flames[i] > 0) continue;
+          const x = i % W, y = (i / W) | 0;
+          for (const p of alive) {
+            if (p.stun > 0 || p.inv > 0 || g.bees.some(b => b.tgt === p.seat)) continue;
+            const d = Math.hypot(p.x - x, p.y - y);
+            if (d > 0.6 && d <= 3) cands.push({ x, y, p });
+          }
+        }
+        if (cands.length) {
+          const c = cands[(Math.random() * cands.length) | 0];
+          g.bees.push({ id: ++g.beeId, x: c.x, y: c.y, z: 0, tgt: c.p.seat, go: 1, t: 0 });
+          ev(g, 'bee', -1, c.p.seat);
+        }
+      }
+    }
+    for (let k = g.bees.length - 1; k >= 0; k--) {
+      const b = g.bees[k]; b.t += dt;
+      if (g.flames[idx(Math.round(b.x), Math.round(b.y))] > 0 && b.z < 0.9) { ev(g, 'beeDie', -1, idx(Math.round(b.x), Math.round(b.y))); g.bees.splice(k, 1); continue; }
+      if (b.go) {
+        const p = g.players[b.tgt];
+        if (!p || p.st !== 0 || b.t > BEE_LIFE) { b.go = 0; continue; }
+        const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy);
+        if (d < 0.4) {
+          b.go = 0;
+          if (p.inv <= 0 && p.stun <= 0) { p.stun = STUN_TIME; p.moving = 0; ev(g, 'sting', -3, p.seat); }
+          continue;
+        }
+        const m = Math.min(d, BEE_SPEED * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.min(0.7, b.z + dt * 3);
+      } else {
+        if (b.home == null) { // nearest bush to hide in
+          let best = -1, bd = 1e9;
+          for (let i = 0; i < W * H; i++) if (g.map[i] === 'g') { const d = Math.hypot(i % W - b.x, ((i / W) | 0) - b.y); if (d < bd) { bd = d; best = i; } }
+          b.home = best;
+        }
+        if (b.home < 0) { g.bees.splice(k, 1); continue; }
+        const hx = b.home % W, hy = (b.home / W) | 0, dx = hx - b.x, dy = hy - b.y, d = Math.hypot(dx, dy);
+        if (d < 0.15 || b.t > BEE_LIFE + 5) { g.bees.splice(k, 1); continue; }
+        const m = Math.min(d, BEE_BACK * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.max(0.1, Math.min(0.7, d * 0.6));
+      }
+    }
   }
 
   function npcStep(g, n, dt) {
@@ -902,6 +957,7 @@ const SIM = (() => {
         }
       }
       p.sinceAcc = (p.sinceAcc || 0) + dt; if (p.lockT > 0) p.lockT -= dt;
+      if (p.stun > 0) { p.stun -= dt; p.moving = 0; if (p.stun <= 0) p.stun = 0; continue; } // dazed by a bee: no moving, no bombs
       if (!(inp.pos && p.st === 0 && acceptPos(g, p, inp))) movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
       if (inp.bomb) placeBomb(g, p, inp.cell);
       for (const id of [...p.ghost]) {
@@ -911,6 +967,7 @@ const SIM = (() => {
     }
 
     for (const n of g.npcs) npcStep(g, n, dt);
+    if (g.mapId === 'classic') beesStep(g, dt);
     for (let k = g.flyItems.length - 1; k >= 0; k--) {
       const f = g.flyItems[k]; f.t += dt;
       const u = Math.min(1, f.t / f.dur);
@@ -1151,7 +1208,8 @@ const SIM = (() => {
     }
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
-      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10)] : 0),
+      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
+      be: (g.bees || []).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.go, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
       e: g.events.slice(-8), w: g.wins, sc: g.score, wn: g.winner, mp: g.mapId,
@@ -1873,7 +1931,7 @@ const THEMES = {
   portal: { floorA: '#3a3163', floorB: '#443a72', grass: false, wallTop: ['#8f7bd0', '#6f5bb0'], wallFront: '#3f2f78', pillar: ['#5a45a0', '#9c88e0', '#47358a', '#e1d8ff', '#8f7bd0'] },
 };
 const MAP_INFO = {
-  classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Bản đồ cổ điển với bụi cỏ để nấp.' },
+  classic: { name: '🌿 Đồng cỏ', theme: 'grass', desc: 'Đồng cỏ rậm rạp, rất nhiều bụi để nấp. Coi chừng: 🐝 ong trong bụi thỉnh thoảng bay ra chích người đứng gần, choáng 2 giây rồi lại trốn vào bụi.' },
   river: { name: '🌊 Sông ngã tư', theme: 'grass', desc: 'Sông chữ thập chia sân thành 4 vùng, mỗi nhánh sông chỉ có 1 cây cầu. Tia nước và bom ném bay qua sông được, người thì không.' },
   storm: { name: '⛈️ Đỉnh Mây Giông', theme: 'storm', desc: 'Sàn đá giữa cơn giông, nhà của 2 anh em Ông Mây Giông — bom rơi gấp đôi!' },
   portal: { name: '🌀 Cổng không gian', theme: 'portal', desc: '4 cổng dịch chuyển: bước vào giữa cổng là bị đưa tới một chỗ ngẫu nhiên trên sân.' },
@@ -2003,6 +2061,13 @@ function handleEvent(e, S) {
     R.disp[e.a] = null; return;
   }
   if (e.k === 'throw') { tone(300, 900, 0.18, 'sine', 0.1); return; }
+  if (e.k === 'bee') { tone(180, 210, 0.5, 'sawtooth', 0.04); tone(185, 200, 0.5, 'square', 0.02, 0.05); return; }
+  if (e.k === 'beeDie') { const i = e.b; spawnDebris(i % W, (i / W) | 0, '#ffd21f', 8); tone(400, 120, 0.2, 'triangle', 0.08); return; }
+  if (e.k === 'sting') {
+    tone(1400, 600, 0.12, 'square', 0.08); tone(500, 300, 0.4, 'sine', 0.06, 0.1);
+    const p = S.p[e.b]; if (p) spawnDebris(p[0] / 100, p[1] / 100, '#ffe14d', 10);
+    addFeed(`🐝 Ong trong bụi cỏ chích ${seatName(S, e.b)}, choáng 2 giây!`, 'sys'); return;
+  }
   if (e.k === 'item') return;
   const tx = eventText(e, S);
   if (tx) addFeed(tx.t, tx.sys ? 'sys' : '');
@@ -2040,7 +2105,7 @@ function predictStep(S, dt) {
   if (!PRED.on) { PRED.p = null; PRED.seat = -1; return; }
   const sp = S.p[ms]; if (!sp) { PRED.on = false; return; }
   const sx = sp[0] / 100, sy = sp[1] / 100;
-  if (!PRED.p || PRED.seat !== ms || sp[2] !== 0) { PRED.p = { x: sx, y: sy, dir: sp[3], st: 0, spd: sp[6], pw: 0, kick: 0, ghost: new Set(), moving: 0 }; PRED.seat = ms; if (sp[2] !== 0) return; }
+  if (!PRED.p || PRED.seat !== ms || sp[2] !== 0 || sp[16] > 0) { PRED.p = { x: sx, y: sy, dir: sp[3], st: 0, spd: sp[6], pw: 0, kick: 0, ghost: new Set(), moving: 0 }; PRED.seat = ms; if (sp[2] !== 0 || sp[16] > 0) return; }
   const P = PRED.p; P.spd = sp[6];
   SIM.useDims(W, H);
   // world built from the latest snapshot
@@ -2171,6 +2236,7 @@ function drawBoard(S, dt, now) {
     const spr = sprites['item_' + f[3]]; if (spr) { const sz = T * 0.95; ctx.save(); ctx.translate(SX(fx), SY(fy) - HZ * (0.55 + z * 1.6)); ctx.rotate(now * 8); ctx.drawImage(spr, -sz / 2, -sz / 2, sz, sz); ctx.restore(); }
   }
   drawNpc(S, now);
+  drawBees(S, now, dt);
   // particles
   for (let k = R.particles.length - 1; k >= 0; k--) {
     const q = R.particles[k]; q.life -= dt;
@@ -2264,6 +2330,51 @@ function drawPortal(x, y, now, i) {
     ctx.beginPath(); ctx.ellipse(cx, cy, T * (0.18 + k * 0.1), TY * (0.16 + k * 0.09), 0, a, a + 4); ctx.stroke();
   }
   if (Math.random() < 0.15) R.particles.push({ x, y, z: 0.1, vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.4, vz: 1.5 + Math.random(), life: 0.6, c: col, s: 0.05 });
+}
+// bees of the meadow: striped body, flapping wings, a buzzing zig-zag
+const beeDisp = new Map();
+function drawBees(S, now, dt) {
+  const live = new Set();
+  for (const b of S.be || []) {
+    const id = b[4]; live.add(id);
+    let d = beeDisp.get(id);
+    const tx = b[0] / 100, ty = b[1] / 100, tz = b[2] / 100;
+    if (!d) { d = { x: tx, y: ty, z: tz }; beeDisp.set(id, d); }
+    const k = Math.min(1, dt * 14); d.x += (tx - d.x) * k; d.y += (ty - d.y) * k; d.z += (tz - d.z) * k;
+    const wob = Math.sin(now * 23 + id) * 0.06, cx = SX(d.x + wob), cy = SY(d.y) - HZ * (0.35 + d.z * 1.1) + Math.sin(now * 17 + id * 3) * T * 0.04;
+    const s = Math.max(8, T * 0.24), dir = (tx - d.x) < -0.01 ? -1 : 1;
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(SX(d.x), SY(d.y), s * 0.8, s * 0.35, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(dir, 1);
+    // wings
+    const flap = Math.abs(Math.sin(now * 40 + id));
+    ctx.fillStyle = 'rgba(235,250,255,.85)'; ctx.strokeStyle = 'rgba(90,120,140,.8)'; ctx.lineWidth = 1;
+    for (const wx of [-0.25, 0.25]) { ctx.beginPath(); ctx.ellipse(wx * s, -s * 0.75, s * 0.42, s * (0.25 + 0.35 * flap), wx * 1.2, 0, 7); ctx.fill(); ctx.stroke(); }
+    // body
+    ctx.fillStyle = '#ffd21f'; ctx.strokeStyle = '#2a1a00'; ctx.lineWidth = Math.max(1.5, s * 0.12);
+    ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.68, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.clip(); ctx.fillStyle = '#2a1a00';
+    for (const sx of [-0.45, 0.05]) ctx.fillRect(sx * s, -s, s * 0.24, s * 2);
+    ctx.restore(); ctx.stroke();
+    // stinger + eye
+    ctx.fillStyle = '#2a1a00'; ctx.beginPath(); ctx.moveTo(-s * 0.95, -s * 0.12); ctx.lineTo(-s * 1.45, 0); ctx.lineTo(-s * 0.95, s * 0.12); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.6, -s * 0.15, s * 0.14, 0, 7); ctx.fill();
+    if (b[3]) { ctx.fillStyle = '#ff3b3b'; ctx.font = `900 ${Math.round(s * 0.9)}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('!', s * 0.2, -s * 1.25); }
+    ctx.restore();
+  }
+  for (const id of [...beeDisp.keys()]) if (!live.has(id)) beeDisp.delete(id);
+}
+// dizzy stars over a stung player
+function drawDazed(cx, y, now, t) {
+  for (let k = 0; k < 3; k++) {
+    const a = now * 5 + k * 2.094, x = cx + Math.cos(a) * T * 0.32, yy = y + Math.sin(a) * T * 0.1;
+    const s = Math.max(5, T * 0.11);
+    ctx.save(); ctx.translate(x, yy); ctx.rotate(now * 4 + k);
+    ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = '#7a4a00'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const rr = i % 2 ? s * 0.45 : s, an = i * Math.PI / 5 - Math.PI / 2; i ? ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr) : ctx.moveTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
 }
 function drawNpc(S, now) {
   const list = Array.isArray(S.n?.[0]) ? S.n : (S.n ? [S.n] : []);
@@ -2573,6 +2684,7 @@ function drawTag(S, s) {
   const name = seatName(S, s), me = isMySeat(S, s);
   ctx.save(); ctx.globalAlpha = me ? 1 : Math.max(0.75, vis);
   const cx = SX(d.x), y = SY(d.y) - (p[2] === 1 ? 0.35 * HZ : 0) - T * 1.25 - 4;
+  if (p[16] > 0) drawDazed(cx, y + T * 0.32, performance.now() / 1000, p[16] / 10);
   if (me) drawMeArrow(cx, y - Math.max(14, T * 0.34) - 2, performance.now() / 1000);
   ctx.font = `800 ${Math.max(12, Math.round(T * 0.3))}px "Baloo 2",sans-serif`;
   const label = (me ? '★ ' + name : name) + (p[15] > 0 ? ` ⚡${Math.ceil(p[15] / 10)}s` : '');
@@ -3177,6 +3289,7 @@ const AUTO = {
   rescue: (a, b) => [`${a} giải cứu đồng đội ${b} quá kịp thời!`, `Tinh thần đồng đội! ${a} cứu ${b}!`],
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
+  sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],
 };

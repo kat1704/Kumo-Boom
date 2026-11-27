@@ -72,7 +72,10 @@ const SIM = (() => {
       else if (isPortal(x, y)) map[i] = 'o';
       else if (nearSpawn(x, y)) map[i] = '.';
       else if (mapId === 'river' && ((BRIDGES.includes(x) && Math.abs(y - RIVER_Y) === 1) || (VBRIDGES.includes(y) && Math.abs(x - RIVER_X) === 1))) map[i] = '.'; // bridge heads stay open
-      else { const r = rand(); if (r < 0.62) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < 0.75) map[i] = 'g'; }
+      else {
+        const r = rand(), crate = mapId === 'classic' ? 0.5 : 0.62, grass = mapId === 'classic' ? 0.88 : 0.75; // the meadow is thick with bushes
+        if (r < crate) { map[i] = 'x'; if (rand() < 0.5) hid[i] = pickItem(rand); } else if (r < grass) map[i] = 'g';
+      }
     }
     const players = [], N = Math.max(2, Math.min(8, (cfg.players || []).length || 4));
     const pad = a => { const o = (a || []).slice(0, N); while (o.length < N) o.push(0); return o; };
@@ -83,7 +86,7 @@ const SIM = (() => {
         seat: s, name: pc.name, bot: !!pc.bot,
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
-        st: 0, trapT: 0, inv: 0, moving: 0,
+        st: 0, trapT: 0, inv: 0, moving: 0, stun: 0,
         maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
@@ -91,7 +94,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand),
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeT: 6 + rand() * 3, beeId: 0,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
       drops: new Array(W * H).fill(null),
@@ -253,6 +256,58 @@ const SIM = (() => {
     const to = pool[(g.rand() * pool.length) | 0];
     p.x = to % W; p.y = (to / W) | 0; p.ghost.clear(); p.tpCd = 1.2;
     ev(g, 'tele', p.seat, from * 1000 + to);
+  }
+
+  // ---- bees hiding in the meadow's bushes: one darts out, stings a nearby player (2s daze) and hides again
+  const BEE_SPEED = 4.6, BEE_BACK = 5.5, BEE_LIFE = 3.2, STUN_TIME = 2;
+  function beesStep(g, dt) {
+    const alive = g.players.filter(p => p && p.st === 0);
+    g.beeT -= dt;
+    if (g.beeT <= 0) {
+      g.beeT = 3.5 + Math.random() * 4.5;
+      if (g.bees.length < Math.max(2, Math.ceil(alive.length / 2))) {
+        const cands = [];
+        for (let i = 0; i < W * H; i++) {
+          if (g.map[i] !== 'g' || g.flames[i] > 0) continue;
+          const x = i % W, y = (i / W) | 0;
+          for (const p of alive) {
+            if (p.stun > 0 || p.inv > 0 || g.bees.some(b => b.tgt === p.seat)) continue;
+            const d = Math.hypot(p.x - x, p.y - y);
+            if (d > 0.6 && d <= 3) cands.push({ x, y, p });
+          }
+        }
+        if (cands.length) {
+          const c = cands[(Math.random() * cands.length) | 0];
+          g.bees.push({ id: ++g.beeId, x: c.x, y: c.y, z: 0, tgt: c.p.seat, go: 1, t: 0 });
+          ev(g, 'bee', -1, c.p.seat);
+        }
+      }
+    }
+    for (let k = g.bees.length - 1; k >= 0; k--) {
+      const b = g.bees[k]; b.t += dt;
+      if (g.flames[idx(Math.round(b.x), Math.round(b.y))] > 0 && b.z < 0.9) { ev(g, 'beeDie', -1, idx(Math.round(b.x), Math.round(b.y))); g.bees.splice(k, 1); continue; }
+      if (b.go) {
+        const p = g.players[b.tgt];
+        if (!p || p.st !== 0 || b.t > BEE_LIFE) { b.go = 0; continue; }
+        const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy);
+        if (d < 0.4) {
+          b.go = 0;
+          if (p.inv <= 0 && p.stun <= 0) { p.stun = STUN_TIME; p.moving = 0; ev(g, 'sting', -3, p.seat); }
+          continue;
+        }
+        const m = Math.min(d, BEE_SPEED * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.min(0.7, b.z + dt * 3);
+      } else {
+        if (b.home == null) { // nearest bush to hide in
+          let best = -1, bd = 1e9;
+          for (let i = 0; i < W * H; i++) if (g.map[i] === 'g') { const d = Math.hypot(i % W - b.x, ((i / W) | 0) - b.y); if (d < bd) { bd = d; best = i; } }
+          b.home = best;
+        }
+        if (b.home < 0) { g.bees.splice(k, 1); continue; }
+        const hx = b.home % W, hy = (b.home / W) | 0, dx = hx - b.x, dy = hy - b.y, d = Math.hypot(dx, dy);
+        if (d < 0.15 || b.t > BEE_LIFE + 5) { g.bees.splice(k, 1); continue; }
+        const m = Math.min(d, BEE_BACK * dt); b.x += dx / d * m; b.y += dy / d * m; b.z = Math.max(0.1, Math.min(0.7, d * 0.6));
+      }
+    }
   }
 
   function npcStep(g, n, dt) {
@@ -418,6 +473,7 @@ const SIM = (() => {
         }
       }
       p.sinceAcc = (p.sinceAcc || 0) + dt; if (p.lockT > 0) p.lockT -= dt;
+      if (p.stun > 0) { p.stun -= dt; p.moving = 0; if (p.stun <= 0) p.stun = 0; continue; } // dazed by a bee: no moving, no bombs
       if (!(inp.pos && p.st === 0 && acceptPos(g, p, inp))) movePlayer(g, p, inp.dx | 0, inp.dy | 0, dt);
       if (inp.bomb) placeBomb(g, p, inp.cell);
       for (const id of [...p.ghost]) {
@@ -427,6 +483,7 @@ const SIM = (() => {
     }
 
     for (const n of g.npcs) npcStep(g, n, dt);
+    if (g.mapId === 'classic') beesStep(g, dt);
     for (let k = g.flyItems.length - 1; k >= 0; k--) {
       const f = g.flyItems[k]; f.t += dt;
       const u = Math.min(1, f.t / f.dur);
@@ -667,7 +724,8 @@ const SIM = (() => {
     }
     return {
       W, H, ph: g.phase, t: Math.round(g.t * 10) / 10, tl: Math.max(0, Math.ceil(g.timeLeft)), md: g.mode, m,
-      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10)] : 0),
+      p: g.players.map(p => p ? [Math.round(p.x * 100), Math.round(p.y * 100), p.st, p.dir, effBombs(p), effFire(p), effSpd(p), p.needles, p.kills, Math.max(0, Math.round(p.trapT * 10)), p.moving, p.team, p.inv > 0 ? 1 : 0, p.kick, p.thr, Math.ceil(p.pw * 10), Math.ceil((p.stun || 0) * 10)] : 0),
+      be: (g.bees || []).map(b => [Math.round(b.x * 100), Math.round(b.y * 100), Math.round(b.z * 100), b.go, b.id]),
       fi: g.flyItems.map(f => [Math.round(f.fx * 100), Math.round(f.fy * 100), Math.round(f.z * 100), f.k, idx(f.tx, f.ty)]),
       b: g.bombs.map(b => [Math.round(b.fx * 100), Math.round(b.fy * 100), Math.round(Math.max(0, b.t) * 10), b.o, Math.round((b.z || 0) * 100), b.air ? idx(b.air.tx, b.air.ty) : -1]),
       e: g.events.slice(-8), w: g.wins, sc: g.score, wn: g.winner, mp: g.mapId,
@@ -700,6 +758,7 @@ const AUTO = {
   rescue: (a, b) => [`${a} giải cứu đồng đội ${b} quá kịp thời!`, `Tinh thần đồng đội! ${a} cứu ${b}!`],
   escape: (a, b) => [`${b} dùng kim thoát hiểm ngoạn mục!`],
   crush: (a, b) => [`${b} bị tường đè, quá đen đủi!`],
+  sting: (a, b) => [`Ối! ${b} bị ong đốt, đứng hình 2 giây!`, `Con ong trong bụi cỏ vừa chích ${b}! Cẩn thận kẻo dính bom!`],
   sudden: () => [`Đột tử! Tường đang sập, các bạn mau ra giữa sân!`],
   start: () => [`Trận đấu bắt đầu! Chúc các bạn may mắn!`, `Vào trận! Ai sẽ là người trụ lại cuối cùng?`],
 };

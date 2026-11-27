@@ -1747,6 +1747,18 @@ const cv = $('cv'), ctx = cv.getContext('2d');
   const arc = P.arc, ell = P.ellipse;
   P.arc = function (x, y, r, a0, a1, ccw) { return arc.call(this, x, y, r > 0 ? r : 0.0001, a0, a1, ccw); };
   P.ellipse = function (x, y, rx, ry, rot, a0, a1, ccw) { return ell.call(this, x, y, rx > 0 ? rx : 0.0001, ry > 0 ? ry : 0.0001, rot, a0, a1, ccw); };
+  // a stray NaN must never throw mid-frame: gradients get finite numbers, and we remember where it came from
+  const F = v => (Number.isFinite(v) ? v : 0);
+  const lin = P.createLinearGradient, rad = P.createRadialGradient;
+  const note = name => { if (!window.__nanSeen) { window.__nanSeen = 1; try { console.warn('non-finite ' + name, new Error().stack); } catch (e) { /* ignore */ } } };
+  P.createLinearGradient = function (x0, y0, x1, y1) {
+    if (![x0, y0, x1, y1].every(Number.isFinite)) note('linear');
+    return lin.call(this, F(x0), F(y0), F(x1), F(y1));
+  };
+  P.createRadialGradient = function (x0, y0, r0, x1, y1, r1) {
+    if (![x0, y0, r0, x1, y1, r1].every(Number.isFinite)) note('radial');
+    return rad.call(this, F(x0), F(y0), Math.max(0, F(r0)), F(x1), F(y1), Math.max(0, F(r1)));
+  };
 })();
 let DPR = 1, VW = 0, VH = 0, T = 40, TY = 29, HZ = 25, OX = 0, OY = 0;
 const sprites = {};
@@ -1775,6 +1787,8 @@ function layout() {
   TY = T * 0.72; HZ = T * 0.62;
   OX = left + (aw - W * T) / 2 + T / 2;
   OY = top + (ah - H * TY - HZ) / 2 + HZ + TY / 2;
+  if (!Number.isFinite(OX)) OX = left + T / 2;
+  if (!Number.isFinite(OY)) OY = top + HZ + TY / 2;
   buildSprites();
 }
 const SX = x => OX + x * T, SY = y => OY + y * TY;
@@ -2349,7 +2363,7 @@ function drawBees(S, now, dt) {
     let d = beeDisp.get(id);
     const tx = b[0] / 100, ty = b[1] / 100, tz = b[2] / 100;
     if (!d) { d = { x: tx, y: ty, z: tz }; beeDisp.set(id, d); }
-    const k = Math.min(1, dt * 14); d.x += (tx - d.x) * k; d.y += (ty - d.y) * k; d.z += (tz - d.z) * k;
+    const k = Number.isFinite(dt) ? Math.min(1, dt * 14) : 1; d.x += (tx - d.x) * k; d.y += (ty - d.y) * k; d.z += (tz - d.z) * k;
     const wob = Math.sin(now * 23 + id) * 0.06, cx = SX(d.x + wob), cy = SY(d.y) - HZ * (0.35 + d.z * 1.1) + Math.sin(now * 17 + id * 3) * T * 0.04;
     const s = Math.max(10, T * 0.3), dir = (tx - d.x) < -0.01 ? -1 : 1;
     // shadow

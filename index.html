@@ -317,6 +317,7 @@ kbd{background:#24385c;border-radius:5px;padding:0 5px;font-family:inherit;font-
     <button id="bHost" title="Làm host">🎙️ Host</button>
     <button id="bPanel" style="display:none" title="Bảng điều khiển host">⚙️</button>
     <button id="bStats" title="Bảng thông số item (Tab)">📊</button>
+    <button id="bGfx" title="Chất lượng đồ họa">✨ Cao</button>
     <button id="bHelp" title="Hướng dẫn nút bấm (H)">❓</button>
     <button id="bTts" title="Đọc bình luận bằng giọng nói">🔇</button>
     <button id="chatToggle" style="display:none">💬</button>
@@ -1980,9 +1981,12 @@ const cv = $('cv'), ctx = cv.getContext('2d');
   };
 })();
 let DPR = 1, VW = 0, VH = 0, T = 40, TY = 29, HZ = 25, OX = 0, OY = 0;
+// graphics quality: 'high' (default) adds lighting, glow, contact shadows, weather and a sharper canvas
+const GFX = { high: (() => { try { return localStorage.getItem('boom.gfx') !== 'low'; } catch (e) { return true; } })() };
 const sprites = {};
 function layout() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const touchDev = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  DPR = Math.min(GFX.high && !touchDev ? 3 : 2, window.devicePixelRatio || 1); // phones stay at 2x: 3x costs a lot of battery
   VW = window.innerWidth; VH = window.innerHeight;
   cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
   const wide = VW > 1100, touch = $('touch').style.display === 'block';
@@ -2439,7 +2443,7 @@ function frame() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, VW, VH);
     try { if (S && S.m) predictStep(S, dt); } catch (e) { PRED.on = false; }
-    if (S && S.m && isFinite(T) && T > 0) drawBoard(S, dt, now);
+    if (S && S.m && isFinite(T) && T > 0) { drawBoard(S, dt, now); if (GFX.high) drawVignette(); }
   } catch (e) {
     showDrawError(e);
     try { for (let k = 0; k < 20; k++) ctx.restore(); ctx.globalAlpha = 1; } catch (er) { /* ignore */ }
@@ -2453,7 +2457,7 @@ function drawBoard(S, dt, now) {
   if (R.shake > 0) { R.shake -= dt; const k = R.shake * T * 0.25; ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k); }
   // board shadow & floor
   ctx.fillStyle = 'rgba(0,0,0,.35)'; rr(ctx, SX(-0.5) + 6, SY(-0.5) + 10, W * T, H * TY + 6, 14); ctx.fill();
-  ctx.drawImage(sprites.floor, SX(-0.5), SY(-0.5), W * T, H * TY);
+  if (GFX.high) drawGround(S); else ctx.drawImage(sprites.floor, SX(-0.5), SY(-0.5), W * T, H * TY);
   drawRiver(now);
   for (let i = 0; i < W * H; i++) {
     const b = R.base[i]; if (!b) continue;
@@ -2550,6 +2554,7 @@ function drawBoard(S, dt, now) {
     ctx.fillRect(SX(q.x) - q.s * T / 2, SY(q.y) - q.z * HZ - q.s * T / 2, q.s * T, q.s * T);
   }
   ctx.globalAlpha = 1;
+  if (GFX.high) drawLighting(S, now, dt);
   drawFlashes(now);
   drawLinks(now);
   drawBolts(S, now);
@@ -3148,6 +3153,106 @@ function drawBolts(S, now) {
     }
   }
 }
+// ===================== high-quality rendering extras =====================
+// soft shadows cast by walls, pillars, crates and the giant cloud (light comes from the top-left); cached per layout
+const shadowCache = { key: '', c: null };
+function drawGround(S) { // floor + soft shadows baked into one picture, rebuilt only when blocks change
+  let key = T + ':' + DPR + ':' + curTheme + ':' + W + 'x' + H + ':';
+  for (let i = 0; i < W * H; i++) { const c = S.m[i]; key += (c === '#' || c === 'x' || c === 'C') ? c : '.'; }
+  if (shadowCache.key !== key || shadowCache.floor !== sprites.floor) {
+    const [c, g] = mk(W * T, H * TY);
+    g.drawImage(sprites.floor, 0, 0, W * T, H * TY);
+    g.filter = 'blur(' + Math.max(2, T * 0.12) + 'px)';
+    for (let i = 0; i < W * H; i++) {
+      const ch = S.m[i]; if (ch !== '#' && ch !== 'x' && ch !== 'C') continue;
+      const x = i % W, y = (i / W) | 0;
+      g.fillStyle = ch === 'x' ? 'rgba(0,0,0,.26)' : 'rgba(0,0,0,.32)';
+      g.beginPath(); g.ellipse((x + 0.5) * T + T * 0.22, (y + 0.5) * TY + TY * 0.42, T * 0.55, TY * 0.42, 0, 0, 7); g.fill();
+    }
+    g.filter = 'none';
+    shadowCache.key = key; shadowCache.c = c; shadowCache.floor = sprites.floor;
+  }
+  ctx.drawImage(shadowCache.c, SX(-0.5), SY(-0.5), W * T, H * TY);
+}
+// ambient life per theme + light sources + grading
+const AMB = { list: [], theme: '', flash: 0, nextFlash: 0 };
+function drawLighting(S, now, dt) {
+  const th = curTheme, x0 = SX(-0.5), y0 = SY(-0.5), bw = W * T, bh = H * TY;
+  // 1) glow from light sources, added on top
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const glow = (x, y, rad, col, al) => { ctx.globalAlpha = Math.max(0, Math.min(1, al)); ctx.drawImage(glowSprite(col), SX(x) - rad, SY(y) - rad, rad * 2, rad * 2); };
+  for (let i = 0; i < W * H; i++) if (S.m[i] === '*') glow(i % W, (i / W) | 0, T * 0.95, 'rgba(120,210,255,A)', 0.28);
+  for (const b of S.b || []) { const t = b[2] / 10, hot = Math.max(0, 1 - t / SIM.BOMB_TIME); glow(b[0] / 100, b[1] / 100, T * (0.55 + hot * 0.35), b[3] >= 0 ? hexA(COLORS[b[3]] || '#88ccff') : 'rgba(180,140,255,A)', 0.12 + hot * 0.18 * (0.6 + 0.4 * Math.sin(now * (6 + hot * 20)))); }
+  for (let i = 0; i < W * H; i++) if (ITEM_ICON[S.m[i]]) glow(i % W, (i / W) | 0, T * 0.5, 'rgba(255,250,210,A)', 0.12 + 0.05 * Math.sin(now * 3 + i));
+  (S.p || []).forEach((p, s) => { if (!p || p[2] === 2 || !R.disp[s]) return; if (p[15] > 0) glow(R.disp[s].x, R.disp[s].y - 0.3, T * 1.1, 'rgba(255,210,80,A)', 0.3 + 0.1 * Math.sin(now * 10)); });
+  if (th === 'portal') for (let i = 0; i < W * H; i++) if (R.base[i] === 'o' || R.base[i] === 'r') glow(i % W, (i / W) | 0, T * 1.2, R.base[i] === 'r' ? hexA(riftCol(S, i)) : 'rgba(200,120,255,A)', 0.22);
+  ctx.globalAlpha = 1; ctx.restore();
+  // 2) ambient particles (fireflies & petals, rain, neon dust)
+  if (AMB.theme !== th) { AMB.theme = th; AMB.list.length = 0; }
+  const want = th === 'storm' ? 70 : th === 'portal' ? 45 : 32;
+  while (AMB.list.length < want) AMB.list.push({ x: Math.random() * W, y: Math.random() * H, z: Math.random(), p: Math.random() * 6.28, s: 0.6 + Math.random() * 0.8 });
+  ctx.save();
+  for (const q of AMB.list) {
+    if (th === 'storm') { // rain streaks falling across the board
+      q.z -= dt * 2.4 * q.s; q.x += dt * 0.5; if (q.z < 0) { q.z = 1; q.x = Math.random() * W; q.y = Math.random() * H; }
+      const px = SX(q.x - 0.5), py = SY(q.y - 0.5) - q.z * HZ * 4;
+      ctx.strokeStyle = 'rgba(190,215,255,.45)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - T * 0.05, py + T * 0.32); ctx.stroke();
+      if (q.z < 0.05) { ctx.strokeStyle = 'rgba(200,225,255,.4)'; ctx.beginPath(); ctx.ellipse(px, SY(q.y - 0.5), T * 0.08, TY * 0.04, 0, 0, 7); ctx.stroke(); }
+    } else if (th === 'portal') { // neon dust drifting up
+      q.z += dt * 0.12 * q.s; q.x += Math.sin(now + q.p) * dt * 0.1; if (q.z > 1) { q.z = 0; q.x = Math.random() * W; q.y = Math.random() * H; }
+      const px = SX(q.x - 0.5), py = SY(q.y - 0.5) - q.z * HZ * 3, al = Math.sin(q.z * Math.PI) * 0.8;
+      ctx.fillStyle = (q.p > 3.14 ? 'rgba(0,240,255,' : 'rgba(255,60,210,') + al + ')'; ctx.fillRect(px, py, 2, 2);
+    } else { // fireflies over the grass, drifting petals
+      q.x += Math.cos(now * 0.7 + q.p) * dt * 0.25; q.y += Math.sin(now * 0.9 + q.p * 1.3) * dt * 0.18;
+      if (q.x < 0 || q.x > W || q.y < 0 || q.y > H) { q.x = Math.random() * W; q.y = Math.random() * H; }
+      const px = SX(q.x - 0.5), py = SY(q.y - 0.5) - (0.6 + 0.4 * Math.sin(now * 1.3 + q.p)) * HZ * 1.6, al = 0.35 + 0.45 * Math.max(0, Math.sin(now * 2.2 + q.p * 3));
+      if (q.s > 1.15) { ctx.fillStyle = 'rgba(255,190,220,.75)'; ctx.save(); ctx.translate(px, py); ctx.rotate(now * 1.5 + q.p); ctx.beginPath(); ctx.ellipse(0, 0, T * 0.07, T * 0.035, 0, 0, 7); ctx.fill(); ctx.restore(); }
+      else { ctx.globalAlpha = al; ctx.drawImage(glowSprite('rgba(240,255,150,A)'), px - T * 0.16, py - T * 0.16, T * 0.32, T * 0.32); ctx.globalAlpha = 1; }
+    }
+  }
+  ctx.restore();
+  // 3) light grading over the board: warm light from the top-left, cool shade bottom-right (cached)
+  ctx.save();
+  const gk = th + ':' + bw + 'x' + bh;
+  if (AMB.gradeKey !== gk) {
+    const [c, g] = mk(bw, bh);
+    const lg = g.createLinearGradient(0, 0, bw, bh);
+    if (th === 'storm') { lg.addColorStop(0, 'rgba(200,220,255,.06)'); lg.addColorStop(1, 'rgba(10,15,40,.22)'); }
+    else if (th === 'portal') { lg.addColorStop(0, 'rgba(255,40,200,.08)'); lg.addColorStop(0.5, 'rgba(0,0,0,0)'); lg.addColorStop(1, 'rgba(0,200,255,.08)'); }
+    else { lg.addColorStop(0, 'rgba(255,236,190,.12)'); lg.addColorStop(1, 'rgba(20,30,70,.16)'); }
+    g.fillStyle = lg; g.fillRect(0, 0, bw, bh);
+    if (th === 'portal') { g.fillStyle = 'rgba(0,0,0,.06)'; for (let y = 0; y < bh; y += 3) g.fillRect(0, y, bw, 1); } // scanlines
+    AMB.gradeKey = gk; AMB.grade = c;
+  }
+  ctx.drawImage(AMB.grade, x0, y0, bw, bh);
+  // storm: lightning flashes now and then
+  if (th === 'storm') {
+    if (!AMB.nextFlash) AMB.nextFlash = now + 6 + Math.random() * 8;
+    if (now > AMB.nextFlash) { AMB.flash = now; AMB.nextFlash = now + 8 + Math.random() * 10; }
+    const fa = now - AMB.flash; if (fa < 0.35) { ctx.fillStyle = `rgba(230,240,255,${(fa < 0.08 || (fa > 0.15 && fa < 0.2)) ? 0.28 : 0.08})`; ctx.fillRect(x0, y0, bw, bh); }
+  }
+  ctx.restore();
+}
+const glowCache = new Map();
+function glowSprite(col) { // soft round light, made once per colour
+  let c = glowCache.get(col); if (c) return c;
+  c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, col.replace('A', 1)); gr.addColorStop(0.4, col.replace('A', 0.45)); gr.addColorStop(1, col.replace('A', 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowCache.set(col, c); return c;
+}
+const hexA = h => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},A)`; };
+// screen vignette, drawn after the board
+const vigCache = { key: '', c: null };
+function drawVignette() {
+  const key = VW + 'x' + VH;
+  if (vigCache.key !== key) {
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(VW / 2)); c.height = Math.max(1, Math.round(VH / 2)); const g = c.getContext('2d'); // half-res is plenty for a soft edge
+    const gr = g.createRadialGradient(c.width / 2, c.height / 2, Math.min(c.width, c.height) * 0.35, c.width / 2, c.height / 2, Math.max(c.width, c.height) * 0.75);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.42)'); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+    vigCache.key = key; vigCache.c = c;
+  }
+  ctx.drawImage(vigCache.c, 0, 0, VW, VH);
+}
 // lightning arcing from the gate someone went in to the gate (or spot) they came out of
 function gateLink(S, from, to, now) {
   const c = S.m && S.m[from] === 'r' || R.base[from] === 'r' ? riftCol(S, from) : '#9fe8ff';
@@ -3488,6 +3593,9 @@ async function goLandscape() {
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) { /* ignore */ }
   setTimeout(() => { if (window.innerHeight > window.innerWidth) toast('Hãy xoay ngang điện thoại (bật xoay màn hình nếu đang khoá)', 3500); layout(); }, 400);
 }
+function syncGfxBtn() { $('bGfx').textContent = GFX.high ? '✨ Cao' : '⚡ Nhẹ'; $('bGfx').title = GFX.high ? 'Đồ họa cao: ánh sáng, bóng đổ, thời tiết. Bấm để chuyển sang chế độ nhẹ (máy yếu)' : 'Đồ họa nhẹ cho máy yếu. Bấm để bật đồ họa cao'; }
+$('bGfx').onclick = () => { GFX.high = !GFX.high; try { localStorage.setItem('boom.gfx', GFX.high ? 'high' : 'low'); } catch (e) { /* ignore */ } syncGfxBtn(); shadowCache.key = ''; layout(); toast(GFX.high ? '✨ Đồ họa cao' : '⚡ Đồ họa nhẹ (mượt hơn trên máy yếu)'); };
+syncGfxBtn();
 $('bFull').onclick = () => {
   if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); return; }
   if (isTouch) goLandscape();

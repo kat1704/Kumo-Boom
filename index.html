@@ -640,7 +640,7 @@ const SIM = (() => {
     }
     return {
       W, H, rand, mode: cfg.mode || 'ffa', map, hid, mapId, flyItems: [],
-      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, geysers: [], geyT: 6 + rand() * 3,
+      npcs: makeNpcs(cfg, mapId, rand), bees: [], beeId: 0, geysers: [], geyT: 3 + rand() * 2,
       giant: mapId === 'storm' ? { x0: (W - 1) / 2 - 1, y0: (H - 1) / 2 - 1, w: 3, h: 2, st: 0, t: 0, cd: 0, warn: [] } : null,
       items: new Array(W * H).fill(null),
       flames: new Float32Array(W * H), flameOwner: new Int8Array(W * H).fill(-1),
@@ -811,14 +811,18 @@ const SIM = (() => {
   function geyserStep(g, dt) {
     g.geyT -= dt;
     if (g.geyT <= 0) {
-      g.geyT = 5 + Math.random() * 4;
+      const el = g.roundTime - g.timeLeft; // the fish get busier as the round goes on
+      g.geyT = Math.max(1.6, 3.6 - el * 0.012) + Math.random() * 1.6;
       const src = []; for (let i = 0; i < W * H; i++) if (g.map[i] === '~') src.push(i);
       const floor = []; for (let i = 0; i < W * H; i++) if (isFloor(g.map[i])) floor.push(i);
       const alive = g.players.filter(p => p && p.st === 0);
       if (src.length && floor.length) {
         const targets = new Set();
-        if (alive.length && Math.random() < 0.6) { const p = alive[(Math.random() * alive.length) | 0]; targets.add(idx(Math.round(p.x), Math.round(p.y))); }
-        else { const n = 2 + ((Math.random() * 2) | 0); for (let k = 0; k < n * 4 && targets.size < n; k++) targets.add(floor[(Math.random() * floor.length) | 0]); }
+        // a volley: one or two players are aimed at, plus a few random cells
+        const shuffled = alive.slice().sort(() => Math.random() - 0.5), np = Math.min(shuffled.length, Math.random() < 0.5 ? 1 : 2);
+        for (let k = 0; k < np; k++) { const p = shuffled[k]; targets.add(idx(Math.round(p.x), Math.round(p.y))); }
+        const n = targets.size + 2 + ((Math.random() * 3) | 0) + (el > 90 ? 1 : 0);
+        for (let k = 0; k < n * 4 && targets.size < n; k++) targets.add(floor[(Math.random() * floor.length) | 0]);
         for (const t of targets) { // the fish surfaces somewhere in the river not far from its target
           const tx = t % W, ty = (t / W) | 0;
           const near = src.map(i => [i, Math.hypot(i % W - tx, ((i / W) | 0) - ty)]).filter(([, d]) => d >= 1.5).sort((p, q) => p[1] - q[1]).slice(0, 6);

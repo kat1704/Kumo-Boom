@@ -341,9 +341,19 @@ body.lobbyMode{background:radial-gradient(ellipse at 50% 30%,#2a2c32,#121316)}
 .slot .sx{position:absolute;right:6px;top:6px;display:flex;gap:4px}
 .slot .sx button{font-size:12px;padding:2px 7px;border-radius:8px}
 .slot .tr{position:absolute;right:10px;top:36px;font-size:18px}
-.slot .carr{position:absolute;top:42%;transform:translateY(-50%);width:34px;height:46px;padding:0;font-size:20px;border-radius:10px;background:rgba(20,21,24,.75);border:1px solid #555}
+.slot .carr{position:absolute;top:40%;transform:translateY(-50%);width:44px;height:64px;padding:0;font-size:24px;z-index:3;touch-action:manipulation;border-radius:10px;background:rgba(20,21,24,.75);border:1px solid #555}
 .slot .carr:hover{background:#ffd36b;color:#2a1a00}
-.slot .carr.l{left:6px}.slot .carr.r{right:6px}
+.slot .carr.l{left:4px}.slot .carr.r{right:4px}
+.slot img.pickme{cursor:pointer}
+.slot img.pickme:hover{filter:drop-shadow(0 0 8px #ffd36b)}
+.slot.ready{border-color:#5fd37a;box-shadow:0 0 0 2px #5fd37a inset}
+.slot.me.ready{border-color:#5fd37a}
+.slot .rdy{position:absolute;left:38px;top:6px;font-size:18px}
+#lbReady{background:linear-gradient(180deg,#5fd37a,#2f9a4a);color:#06210f;border-color:#2a7a3e;font-weight:800}
+#lbReady.on{background:#3a3d44;color:#fff;border-color:#555}
+#charBox .cgrid button.lk{opacity:.4;cursor:not-allowed}
+#charBox .cgrid small{font-size:11px;color:#ff9b9b}
+#lbSlots{touch-action:manipulation}
 .slot .cname{font-size:11.5px;color:#ffd36b;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .slot .trs{display:flex;gap:4px;margin-top:5px}
 .slot .trs button{width:34px;height:30px;padding:0;font-size:17px;border-radius:8px;background:#1d1e22;border:2px solid #3a3d44;display:grid;place-items:center}
@@ -429,6 +439,7 @@ body.lobbyMode #bPlay,body.lobbyMode #bWatch,body.lobbyMode #bHost,body.lobbyMod
     <button id="lbHost">👑 Nhận host</button>
     <button id="lbSet">⚙️ Cài đặt</button>
     <button id="lbInvite">🔗 Mời</button>
+    <button id="lbReady" style="display:none">✅ Sẵn sàng</button>
     <span id="lbInfo"></span>
     <button id="lbStart" class="pri">▶ Bắt đầu</button>
   </div>
@@ -2527,19 +2538,25 @@ function lobbySeatType(i, type) {
 function renderLobby() {
   const on = inLobby();
   document.body.classList.toggle('lobbyMode', on);
+  const mySeatK = seatOfPeer(app.S, app.myPeer);
+  if (myReady && (!on || mySeatK < 0)) setReady(false); // a new round (or leaving the seat) clears ready
   if (!on) { lobbyKey = ''; return; }
+  if (mySeatK >= 0) { // someone readied with my character before me: move me to a free one
+    const mine = effCharOf(app.myPeer, myChar), o = takenByOther(mine);
+    if (o) { const c = nextFreeChar(mine, 1); setChar(c, true); toast(`${o.name} đã giữ ${CHAR_NAMES[mine]}, bạn được đổi sang ${CHAR_NAMES[c]}`); }
+  }
   const S = app.S, hostMe = amHost(), online = app.mode === 'online';
   const people = [];
-  people.push({ id: app.myPeer, name: app.name || 'Bạn', want: app.role, ch: myChar, me: true, host: hostMe });
-  if (online) for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer' && p.peer !== 'srv') { const pr = p.presence || {}; people.push({ id: p.peer, name: clean(pr.n, 16) || 'Người chơi', want: pr.want, ch: Number.isInteger(pr.ch) ? pr.ch : -1, host: p.peer === app.hostPeer || (SRVM() && srvPres().ad === p.peer) }); }
+  people.push({ id: app.myPeer, name: app.name || 'Bạn', want: app.role, ch: myChar, me: true, host: hostMe, rd: !!myReady });
+  if (online) for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer' && p.peer !== 'srv') { const pr = p.presence || {}; people.push({ id: p.peer, name: clean(pr.n, 16) || 'Người chơi', want: pr.want, ch: Number.isInteger(pr.ch) ? pr.ch : -1, rd: pr.rd > 0, host: p.peer === app.hostPeer || (SRVM() && srvPres().ad === p.peer) }); }
   const c = S.cfg || {}, mapName = (MAP_INFO[S.mp] || {}).name || '';
-  const key = JSON.stringify([S.s, S.mp, c, people, hostMe, app.role, !!app.hostPeer, myChar, myTrait]);
+  const key = JSON.stringify([S.s, S.mp, c, people, hostMe, app.role, !!app.hostPeer, myChar, myTrait, myReady]);
   if (key === lobbyKey) return; lobbyKey = key;
   const seated = new Set((S.s || []).filter(s => s && s[0] === 2).map(s => s[2]));
   $('lbPeopleH').textContent = `👥 Trong phòng (${people.length})`;
   $('lbPeople').innerHTML = people.map(p => {
     const k = (S.s || []).findIndex(s => s && s[0] === 2 && s[2] === p.id), ci = p.ch >= 0 && p.ch < SPR.length ? p.ch : (k >= 0 ? charOf(S, k) : -1);
-    return `<div class="lbP${p.me ? ' me' : ''}" data-peer="${esc(p.id)}" ${hostMe ? 'draggable="true"' : ''}>${ci >= 0 && SPR[ci] ? `<img src="${SPR[ci].src}" alt="">` : '<span style="font-size:22px">👤</span>'}<div style="flex:1;min-width:0"><div class="nm">${p.host ? '🎙️ ' : ''}${esc(p.name)}${p.me ? ' (bạn)' : ''}</div><div class="tg">${k >= 0 ? `🎮 Ghế ${k + 1}` : p.want === 'play' ? '⏳ Chờ vào ghế' : '👀 Đang xem'}</div></div></div>`;
+    return `<div class="lbP${p.me ? ' me' : ''}" data-peer="${esc(p.id)}" ${hostMe ? 'draggable="true"' : ''}>${ci >= 0 && SPR[ci] ? `<img src="${SPR[ci].src}" alt="">` : '<span style="font-size:22px">👤</span>'}<div style="flex:1;min-width:0"><div class="nm">${p.host ? '🎙️ ' : ''}${esc(p.name)}${p.me ? ' (bạn)' : ''}</div><div class="tg">${k >= 0 ? `🎮 Ghế ${k + 1}${p.rd ? ' · ✅ Sẵn sàng' : ''}` : p.want === 'play' ? '⏳ Chờ vào ghế' : '👀 Đang xem'}</div></div></div>`;
   }).join('');
   if (hostMe) $('lbPeople').querySelectorAll('.lbP').forEach(el => { el.ondragstart = ev => { ev.dataTransfer.setData('text/plain', el.dataset.peer); }; });
   const nS = (S.s || []).length;
@@ -2547,29 +2564,26 @@ function renderLobby() {
     const st = S.s?.[i], col = COLORS[i];
     if (i >= nS) return `<div class="slot locked" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span><div class="big">🔒</div><div class="st">${hostMe ? 'Bấm để mở ghế' : 'Đang đóng'}</div></div>`;
     if (!st) return `<div class="slot empty" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span><div class="big">＋</div><div class="sn">Ghế trống</div><div class="st">Bấm để vào</div>${hostMe ? `<div class="sx"><button data-bot="${i}">+ Bot</button></div>` : ''}</div>`;
-    const mine = st[0] === 2 && st[2] === app.myPeer, ci = mine && myChar >= 0 && myChar < SPR.length ? myChar : charOf(S, i);
-    const tag = st[0] === 1 ? '🤖 Bot · bấm để thay chỗ' : mine ? '⭐ Bạn' : '🎮 Người chơi';
+    const mine = st[0] === 2 && st[2] === app.myPeer, ci = mine ? effCharOf(app.myPeer, myChar) : charOf(S, i), rdy = st[0] === 2 && isPeerReady(st[2]);
+    const tag = st[0] === 1 ? '🤖 Bot · bấm để thay chỗ' : (mine ? '⭐ Bạn' : '🎮 Người chơi') + (rdy ? ' · ✅ Sẵn sàng' : '');
     const tools = hostMe ? `<div class="sx">${st[0] === 2 ? `<button data-out="${i}" title="Mời ra">✕</button>` : `<button data-empty="${i}" title="Bỏ bot">Bỏ bot</button>`}</div>` : '';
-    const pick = mine ? `<button class="carr l" data-cstep="-1" title="Nhân vật trước">◀</button><button class="carr r" data-cstep="1" title="Nhân vật sau">▶</button>` : '';
+    const pick = mine && !myReady ? `<button class="carr l" data-cstep="-1" title="Nhân vật trước">◀</button><button class="carr r" data-cstep="1" title="Nhân vật sau">▶</button>` : '';
     const trs = mine ? `<div class="trs">${TRAIT_KEYS.map(t => `<button data-tr="${t}" class="${t === myTrait ? 'on' : ''}" title="${esc(TRAITS[t][0] + ': ' + TRAITS[t][1])}">${traitIcon(t)}</button>`).join('')}</div>` : '';
-    return `<div class="slot ${st[0] === 1 ? 'bot' : 'human'}${mine ? ' me' : ''}" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span>${tools}${pick}${SPR[ci] ? `<img src="${SPR[ci].src}" alt="">` : ''}${mine ? `<div class="cname">${esc(CHAR_NAMES[ci] || '')}</div>` : ''}<div class="sn">${esc(st[1] || '')}</div><div class="st">${tag}</div>${trs}${st[3] ? `<span class="tr" title="${esc(TRAITS[st[3]]?.[0] || '')}">${traitIcon(st[3])}</span>` : ''}</div>`;
+    return `<div class="slot ${st[0] === 1 ? 'bot' : 'human'}${mine ? ' me' : ''}${rdy ? ' ready' : ''}" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span>${tools}${pick}${rdy ? '<span class="rdy">✅</span>' : ''}${SPR[ci] ? `<img src="${SPR[ci].src}" alt=""${mine ? ' class="pickme" title="Bấm để chọn nhân vật"' : ''}>` : ''}${mine ? `<div class="cname">${esc(CHAR_NAMES[ci] || '')}</div>` : ''}<div class="sn">${esc(st[1] || '')}</div><div class="st">${tag}</div>${trs}${st[3] ? `<span class="tr" title="${esc(TRAITS[st[3]]?.[0] || '')}">${traitIcon(st[3])}</span>` : ''}</div>`;
   }).join('');
   $('lbSlots').querySelectorAll('.slot').forEach(el => {
     const k = +el.dataset.k;
-    el.onclick = ev => {
-      const b = ev.target.closest('button');
-      if (b) { ev.stopPropagation();
-        if (b.dataset.cstep) { const n = SPR.length, cur = myChar >= 0 && myChar < n ? myChar : charOf(app.S, k); setChar(((cur + +b.dataset.cstep) % n + n) % n); lobbyKey = ''; return; }
-        if (b.dataset.tr) { setTrait(b.dataset.tr); lobbyKey = ''; return; }
-        if (b.dataset.out) hostUnseat(+b.dataset.out); else if (b.dataset.empty) lobbySeatType(+b.dataset.empty, 'empty'); else if (b.dataset.bot) lobbySeatType(+b.dataset.bot, 'bot'); return; }
-      ac(); lobbySeat(k);
-    };
     if (hostMe) {
       el.ondragover = ev => { ev.preventDefault(); el.classList.add('over'); };
       el.ondragleave = () => el.classList.remove('over');
       el.ondrop = ev => { ev.preventDefault(); el.classList.remove('over'); const peer = ev.dataTransfer.getData('text/plain'); if (!peer || k >= nS) return; if (peer === app.myPeer) lobbySeat(k); else hostAssign(peer, k); };
     }
   });
+  const rl = readyList(), humans = (S.s || []).filter(s => s && s[0] === 2 && s[2] !== app.myPeer).length;
+  $('lbReady').style.display = mySeatK >= 0 && !hostMe && online ? '' : 'none';
+  $('lbReady').textContent = myReady ? '❌ Bỏ sẵn sàng' : '✅ Sẵn sàng';
+  $('lbReady').classList.toggle('on', !!myReady);
+  $('lbStart').textContent = hostMe && humans ? `▶ Bắt đầu (${rl.filter(x => !x.me || !hostMe).length}/${humans} sẵn sàng)` : '▶ Bắt đầu';
   const modeTxt = c.mode === 'team' || S.md === 'team' ? 'Chia 2 đội' : 'Đấu đơn';
   const sizeTxt = { normal: 'bình thường', medium: 'vừa', large: 'siêu lớn' }[c.size || host.size] || '';
   $('lbInfo').textContent = `🗺️ ${c.map === 'random' || (!c.map && host.mapSel === 'random') ? 'Map ngẫu nhiên' : mapName} · ${modeTxt} · sân ${sizeTxt} · ${nS} ghế`;
@@ -2580,6 +2594,21 @@ function renderLobby() {
   $('lbInvite').style.display = online && IS_WEB ? '' : 'none';
   $('lbPlay').classList.toggle('pri', app.role !== 'play');
 }
+$('lbSlots').addEventListener('pointerdown', ev => {
+  const b = ev.target.closest('button'), el = ev.target.closest('.slot'); if (!el) return;
+  const k = +el.dataset.k;
+  if (b) {
+    ev.preventDefault(); ev.stopPropagation(); ac();
+    if (b.dataset.cstep) { const n = SPR.length, cur = effCharOf(app.myPeer, myChar); setChar(nextFreeChar(cur < 0 ? 0 : cur, +b.dataset.cstep)); return; }
+    if (b.dataset.tr) { setTrait(b.dataset.tr); lobbyKey = ''; return; }
+    if (b.dataset.out) hostUnseat(+b.dataset.out); else if (b.dataset.empty) lobbySeatType(+b.dataset.empty, 'empty'); else if (b.dataset.bot) lobbySeatType(+b.dataset.bot, 'bot');
+    return;
+  }
+  if (ev.target.closest('img.pickme')) { ev.preventDefault(); if (myReady) return toast('Bỏ Sẵn sàng trước rồi mới đổi nhân vật'); openCharPicker(); return; }
+  if (ev.button !== undefined && ev.button !== 0) return;
+  ac(); lobbySeat(k);
+});
+$('lbReady').onclick = () => { ac(); setReady(!myReady); toast(myReady ? '✅ Đã sẵn sàng, nhân vật của bạn được giữ cố định' : 'Đã bỏ sẵn sàng'); };
 $('lbPlay').onclick = () => { ac(); app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bPlay').click(); lobbyKey = ''; };
 $('lbWatch').onclick = () => { app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bWatch').click(); lobbyKey = ''; };
 $('lbChar').onclick = () => openCharPicker();
@@ -2598,6 +2627,7 @@ $('lbSet').onclick = () => { if (amHost()) { $('hostPanel').style.display = 'blo
 $('lbInvite').onclick = () => $('bInvite').click();
 $('lbStart').onclick = () => { ac(); $('hpStart').click(); };
 setInterval(() => { try { renderLobby(); } catch (e) { console.error(e); } }, 250);
+setInterval(() => { const b = $('charBox'); if (b && b.style.display !== 'none') renderCharPicker(); }, 1000);
 
 function frame() {
   requestAnimationFrame(frame); // schedule first: one bad frame can never freeze the screen
@@ -3873,22 +3903,63 @@ function charOf(S, s) {
   if (Number.isInteger(v) && v >= 0 && v < SPR.length) return v;
   return s % SPR.length;
 }
-function setChar(k) {
+// ---- ready & character locks: whoever pressed Sẵn sàng first owns their character
+let myReady = 0; // time I pressed ready (0 = not ready)
+const seatOfPeer = (S, peer) => (S?.s || []).findIndex(s => s && s[0] === 2 && s[2] === peer);
+function effCharOf(peer, ch) {
+  if (Number.isInteger(ch) && ch >= 0 && ch < SPR.length) return ch;
+  const k = seatOfPeer(app.S, peer); return k >= 0 ? k % SPR.length : -1;
+}
+function readyList() {
+  const out = [];
+  if (app.mode === 'online') for (const p of app.peers) {
+    if (p.sameTab || p.kind !== 'viewer' || p.peer === 'srv') continue;
+    const pr = p.presence || {};
+    if (pr.rd > 0 && seatOfPeer(app.S, p.peer) >= 0) out.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi', t: pr.rd, c: effCharOf(p.peer, pr.ch) });
+  }
+  if (myReady) out.push({ peer: app.myPeer, me: true, name: app.name, t: myReady, c: effCharOf(app.myPeer, myChar) });
+  return out.sort((x, y) => x.t - y.t);
+}
+function lockedChars() { const m = new Map(); for (const x of readyList()) if (x.c >= 0 && !m.has(x.c)) m.set(x.c, x); return m; }
+const takenByOther = c => { const o = lockedChars().get(c); return o && !o.me ? o : null; };
+const isPeerReady = peer => peer === app.myPeer ? !!myReady : (app.peers.find(p => p.peer === peer)?.presence?.rd || 0) > 0;
+function nextFreeChar(from, step) {
+  const n = SPR.length;
+  for (let i = 1; i <= n; i++) { const c = ((from + step * i) % n + n) % n; if (!takenByOther(c)) return c; }
+  return from;
+}
+function setReady(on) {
+  if (on) {
+    let c = effCharOf(app.myPeer, myChar);
+    if (c < 0) return toast('Vào ghế trước rồi mới bấm Sẵn sàng');
+    if (takenByOther(c)) { c = nextFreeChar(c, 1); toast('Nhân vật đó đã có người giữ, đổi sang ' + CHAR_NAMES[c]); }
+    myChar = c; store.set('char', String(c)); myReady = Date.now();
+  } else myReady = 0;
+  if (app.nroom) app.nroom.presence({ rd: myReady || null, ch: myChar }).catch(() => {});
+  lobbyKey = ''; renderCharPicker();
+}
+function setChar(k, force) {
+  if (!force && myReady) { toast('Bỏ Sẵn sàng trước rồi mới đổi nhân vật'); return false; }
+  const o = k >= 0 ? takenByOther(k) : null;
+  if (!force && o) { toast(`${CHAR_NAMES[k]} đã được ${o.name} giữ (sẵn sàng trước)`); return false; }
   myChar = k; store.set('char', String(k));
   if (app.nroom) app.nroom.presence({ ch: k }).catch(() => {});
-  renderCharPicker();
+  lobbyKey = ''; renderCharPicker(); return true;
 }
 function renderCharPicker() {
   const box = $('charBox'); if (!box || box.style.display === 'none') return;
   const opts = [-1, ...SPR.map((_, i) => i)];
-  box.querySelector('.cgrid').innerHTML = opts.map(k => `<button data-k="${k}" class="${k === myChar ? 'on' : ''}">${k < 0 ? '<span class="cauto">🎲</span>' : `<img src="${SPR[k].src}" alt="">`}<b>${k < 0 ? 'Theo ghế' : CHAR_NAMES[k]}</b></button>`).join('');
-  box.querySelectorAll('.cgrid button').forEach(b => b.onclick = () => { setChar(+b.dataset.k); toast('Đã chọn ' + (myChar < 0 ? 'nhân vật theo ghế' : CHAR_NAMES[myChar])); });
+  const locks = lockedChars();
+  box.querySelector('.cgrid').innerHTML = opts.map(k => { const o = k >= 0 ? locks.get(k) : null, lk = o && !o.me;
+    return `<button data-k="${k}" class="${k === myChar ? 'on' : ''}${lk ? ' lk' : ''}">${k < 0 ? '<span class="cauto">🎲</span>' : `<img src="${SPR[k].src}" alt="">`}<b>${k < 0 ? 'Theo ghế' : CHAR_NAMES[k]}</b>${lk ? `<small>🔒 ${esc(o.name)}</small>` : ''}</button>`; }).join('');
+  box.querySelector('.chint2').textContent = myReady ? '✅ Bạn đang Sẵn sàng: bỏ Sẵn sàng để đổi nhân vật.' : '🔒 = người khác đã Sẵn sàng với nhân vật đó.';
+  box.querySelectorAll('.cgrid button').forEach(b => b.onclick = () => { if (setChar(+b.dataset.k)) { toast('Đã chọn ' + (myChar < 0 ? 'nhân vật theo ghế' : CHAR_NAMES[myChar])); box.style.display = 'none'; } });
 }
 function openCharPicker() {
   let box = $('charBox');
   if (!box) {
     box = document.createElement('div'); box.id = 'charBox'; box.className = 'panel';
-    box.innerHTML = `<div class="row" style="justify-content:space-between;margin:0 0 8px"><h3 style="margin:0">🧑 Chọn nhân vật</h3><button id="charClose">✕</button></div><div class="cgrid"></div><div class="chint">Ai cũng chọn được, trùng nhau cũng không sao (màu vòng chân theo ghế). "Theo ghế" = dùng nhân vật mặc định của ghế bạn ngồi.</div>`;
+    box.innerHTML = `<div class="row" style="justify-content:space-between;margin:0 0 8px"><h3 style="margin:0">🧑 Chọn nhân vật</h3><button id="charClose">✕</button></div><div class="cgrid"></div><div class="chint2" style="font-size:13px;color:#ffd36b;margin-bottom:6px"></div><div class="chint">Ai cũng chọn được, trùng nhau cũng không sao (màu vòng chân theo ghế). "Theo ghế" = dùng nhân vật mặc định của ghế bạn ngồi.</div>`;
     document.body.appendChild(box);
     box.querySelector('#charClose').onclick = () => { box.style.display = 'none'; };
   }

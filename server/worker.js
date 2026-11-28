@@ -149,7 +149,7 @@ const SIM = (() => {
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0, stun: 0, wet: 0,
-        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
+        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, // everyone starts with 1 needle; the needle trait gives a second one kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
       });

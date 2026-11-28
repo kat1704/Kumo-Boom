@@ -560,7 +560,7 @@ body.lobbyMode #bPlay,body.lobbyMode #bWatch,body.lobbyMode #bHost,body.lobbyMod
     </div>
     <div class="hcard wide">
       <div class="ht">📜 Luật & vật phẩm</div>
-      <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · có sẵn 1 kim chích.<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
+      <div class="hl">Bom mây nổ thành tia nước hình chữ thập. Dính tia là bị nhốt trong <b>bong bóng 4,5 giây</b>: đối thủ chạm vào là bị loại, đồng đội chạm vào (chế độ chia đội) là được cứu, hết giờ thì thua. Còn 90 giây là <b>đột tử</b>: tường sập dần từ ngoài vào. Người (hoặc đội) trụ lại cuối cùng thắng.<br>🎯 <b>Đặc tính khởi đầu</b> (đầu mỗi ván có 10 giây để chọn, bấm phím 1–4 hoặc nút trên màn hình): thêm 1 bom · tốc độ +1 cấp · tia nổ dài +1 · thêm 1 kim chích (mỗi người mặc định đã có sẵn 1 kim từ đầu ván).<br>⭐ <b>Điểm:</b> hạ gục 1 người +1, thắng ván +2 (cộng dồn qua các ván).<br>🌿 <b>Bụi cỏ:</b> đi vào để nấp, đối thủ không nhìn thấy bạn — nhưng bụi cỏ sẽ rung rinh khi có người đi qua!</div>
       <div class="hl" style="margin-top:6px">🗺️ <b>Bản đồ:</b> 🌿 Đồng cỏ (bụi rậm khắp nơi, có 2 con 🐝 ong bay lượn, lại gần 2 ô là bị chích choáng 2 giây) · 🌊 Bờ sông (sông chữ thập uốn lượn chia 4 khu, mỗi nhánh 1 cầu; cá thỉnh thoảng nhô lên phun nước, trúng là đi cực chậm 4 giây) · ⛈️ Đỉnh Mây Giông (sàn đá giông bão, giữa sân có Mây Khổng Lồ đang ngủ: bắn trúng là nó giật sét 5 ô) · 🌀 Cổng không gian (thành phố Cyberpunk: 4 cổng dịch chuyển ngẫu nhiên, càng về sau càng mở thêm vết nứt không gian nối từng cặp; tia nổ và bom bị đá đi xuyên qua cổng). Host chọn trong ⚙️.<br>⛈️ <b>Ông Mây Giông</b> có mặt ở mọi bản đồ: mây hoá đỏ là sắp thả bom, vòng đỏ trên sàn là chỗ bom rơi; càng về cuối thả càng nhanh và nhiều (host gõ số lượng trong ⚙️, 0 là tắt).</div>
       <div class="hitems"><span><i data-ico="b"></i> Thêm bom</span><span><i data-ico="f"></i> Tia dài hơn</span><span>👟 Chạy nhanh</span><span>📌 Kim cứu thân</span><span>🦶 Đá bom</span><span>🧤 Ném bom</span><span><i data-ico="p"></i> Naruko (Ông Mây Giông ném ra — chỉ số tối đa 10 giây)</span></div>
     </div>
@@ -729,7 +729,7 @@ const SIM = (() => {
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0, stun: 0, wet: 0,
-        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 1 : 0, kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
+        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, // everyone starts with 1 needle; the needle trait gives a second one kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
       });
@@ -2004,7 +2004,7 @@ const ITEM_INFO = [
 const BOT_NAMES = ['Bot Bánh Bao', 'Bot Trà Sữa', 'Bot Kẹo Dẻo', 'Bot Bắp Rang', 'Bot Bánh Mì', 'Bot Kem Que', 'Bot Xôi Gà', 'Bot Chè Bưởi'];
 const TEAM_NAME = ['Đội Đỏ-Vàng', 'Đội Xanh-Lá'];
 const CHAR_NAMES = ['Lữ Khách Tím', 'Kỳ Sĩ Cầm Cờ', 'Tiểu Thư Hoa', 'Hiệp Sĩ Nón Cói', 'Thiếu Nữ Áo Hoa', 'Nữ Hiệp Áo Lục', 'Cô Nương Quạt Hoa', 'Thiếu Gia Áo Lam', 'Quan Văn Mũ Đen', 'Tiểu Thư Hoa Đỏ', 'Nữ Lễ Hội Mùa Hạ', 'Chàng Tóc Xanh', 'Trai Lễ Hội', 'Tiểu Thư Áo Trắng', 'Cô Nàng Kính Cận', 'Chàng Áo Lam', 'Trai Khăn Đen Áo Lục', 'Vu Nữ Áo Trắng', 'Võ Sinh Áo Đen', 'Thiếu Nữ Kimono Đỏ', 'Thiếu Nữ Kimono Tím'];
-const TRAITS = { b: ['Thêm 1 bom', 'Bắt đầu với 2 bom'], s: ['Chạy nhanh', 'Tốc độ +1 cấp từ đầu'], f: ['Tia dài', 'Tia nổ dài thêm 1 ô từ đầu'], n: ['Có kim', 'Bắt đầu với 1 kim chích'] };
+const TRAITS = { b: ['Thêm 1 bom', 'Bắt đầu với 2 bom'], s: ['Chạy nhanh', 'Tốc độ +1 cấp từ đầu'], f: ['Tia dài', 'Tia nổ dài thêm 1 ô từ đầu'], n: ['Thêm kim', 'Bắt đầu với 2 kim chích (mặc định ai cũng có 1)'] };
 const TRAIT_KEYS = ['b', 's', 'f', 'n'];
 const $ = id => document.getElementById(PFX + id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

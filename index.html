@@ -306,6 +306,62 @@ body.noguide #keyHint,body.noguide .mapinfo,body.noguide .iguide,body.noguide #s
   #mapTag{max-width:90px}
   #roleBtns button{padding:3px 6px;font-size:11.5px}
 }
+
+/* ---- waiting room ---- */
+#lobby{left:12px;right:314px;top:72px;bottom:12px;z-index:6;display:none;flex-direction:column;gap:10px;padding:12px}
+body.lobbyMode #lobby{display:flex}
+body.lobbyMode #left,body.lobbyMode #center,body.lobbyMode #keyHint,body.lobbyMode #banner,body.lobbyMode #traitBar,body.lobbyMode #cv{display:none!important}
+body.lobbyMode{background:radial-gradient(ellipse at 50% 30%,#2a2c32,#121316)}
+.lbTools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lbTools button{font-size:15px;padding:8px 14px}
+#lbStart{margin-left:auto;font-size:17px;padding:9px 22px;background:linear-gradient(180deg,#ffd36b,#e0a020);color:#2a1a00;border-color:#b07a10}
+#lbInfo{font-size:13.5px;color:var(--mut)}
+.lbBody{flex:1;display:flex;gap:12px;min-height:0}
+.lbPeople{width:220px;flex:none;display:flex;flex-direction:column;gap:6px;overflow:auto}
+#lbPeople{display:flex;flex-direction:column;gap:5px}
+.lbP{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:#2b2d33;font-size:14px;cursor:default}
+.lbP img{height:34px;image-rendering:pixelated}
+.lbP .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.lbP .tg{font-size:11.5px;color:var(--mut)}
+.lbP.me{outline:2px solid #ffd36b}
+.lbP[draggable=true]{cursor:grab}
+#lbSlots{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:10px;min-height:0}
+.slot{position:relative;border-radius:16px;background:#26282d;border:2px solid #3a3d44;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:8px 6px 10px;cursor:pointer;overflow:hidden;min-height:0;transition:transform .08s,border-color .15s}
+.slot:hover{transform:translateY(-2px);border-color:var(--c)}
+.slot .num{position:absolute;left:8px;top:6px;width:26px;height:26px;border-radius:50%;background:var(--c);color:#111;font-weight:900;display:grid;place-items:center;font-size:14px}
+.slot img{flex:1;min-height:0;max-height:70%;max-width:90%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 4px 4px rgba(0,0,0,.5))}
+.slot .sn{font-weight:800;font-size:15px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}
+.slot .st{font-size:12px;color:var(--mut)}
+.slot.bot img{opacity:.55;filter:grayscale(.4)}
+.slot.empty,.slot.locked{border-style:dashed;justify-content:center}
+.slot.empty .big,.slot.locked .big{font-size:34px;opacity:.7}
+.slot.locked{opacity:.45}
+.slot.me{border-color:#ffd36b;box-shadow:0 0 0 2px #ffd36b inset,0 0 18px rgba(255,211,107,.35)}
+.slot.over{border-color:#7fe0ff;background:#2c3440}
+.slot .sx{position:absolute;right:6px;top:6px;display:flex;gap:4px}
+.slot .sx button{font-size:12px;padding:2px 7px;border-radius:8px}
+.slot .tr{position:absolute;right:10px;top:36px;font-size:18px}
+body.lobbyMode #bPlay,body.lobbyMode #bWatch,body.lobbyMode #bHost,body.lobbyMode #bInvite,body.lobbyMode #bChar,body.lobbyMode #bPanel,body.lobbyMode #bPause{display:none!important}
+@media (max-width:1100px){
+  #lobby{left:8px;right:8px;bottom:8px;padding:8px}
+  .lbPeople{width:150px}
+  .lbTools button{font-size:13px;padding:6px 9px}
+  #lbSlots{gap:6px}
+  .slot .sn{font-size:13px}
+}
+@media (max-width:700px){
+  .lbBody{flex-direction:column}
+  .lbPeople{width:auto;max-height:110px}
+  #lbPeople{flex-direction:row;flex-wrap:wrap}
+  #lbSlots{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,minmax(120px,1fr))}
+}
+@media (orientation:landscape) and (max-height:560px){
+  #lobby{left:6px;right:6px;bottom:6px;gap:6px;padding:6px}
+  .lbTools button{font-size:12px;padding:4px 8px}
+  .lbPeople{width:130px}
+  .lbP{padding:3px 6px;font-size:12px}.lbP img{height:24px}
+  .slot .sn{font-size:12px}.slot .num{width:20px;height:20px;font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -355,6 +411,22 @@ body.noguide #keyHint,body.noguide .mapinfo,body.noguide .iguide,body.noguide #s
   <div id="chatRow"><input id="chatIn" maxlength="140" placeholder="Nhắn gì đó… (Enter)"><button id="chatSend">Gửi</button></div>
 </div>
 
+<div id="lobby" class="panel">
+  <div class="lbTools">
+    <button id="lbPlay" class="pri">🎮 Vào ghế</button>
+    <button id="lbWatch">👀 Xem</button>
+    <button id="lbChar">🧑 Nhân vật</button>
+    <button id="lbHost">🎙️ Làm host</button>
+    <button id="lbSet">⚙️ Cài đặt</button>
+    <button id="lbInvite">🔗 Mời</button>
+    <span id="lbInfo"></span>
+    <button id="lbStart" class="pri">▶ Bắt đầu</button>
+  </div>
+  <div class="lbBody">
+    <div class="lbPeople"><div class="sect" id="lbPeopleH">👥 Trong phòng</div><div id="lbPeople"></div></div>
+    <div id="lbSlots"></div>
+  </div>
+</div>
 <div id="banner" class="panel"><div class="who">🎙️ Bình luận viên</div><div id="bannerTxt"></div></div>
 <div id="center"></div>
 <div id="keyHint">⌨️ <kbd>←↑↓→</kbd> đi · <kbd>Space</kbd> đặt / ném bom · <kbd>E</kbd> dùng kim · <kbd>Tab</kbd> thông số · <kbd>H</kbd> hướng dẫn</div>
@@ -2419,6 +2491,89 @@ function showDrawError(e) {
   console.error(e);
   toast('⚠️ Lỗi vẽ màn hình: ' + (e && e.message || e) + ' (game vẫn chạy tiếp — chụp màn hình gửi Claude nhé)', 6000);
 }
+// ===================== waiting room =====================
+let lobbyKey = '';
+const inLobby = () => !!app.mode && !!app.S && app.S.ph === 'lobby' && app.S.rk !== -1 && $('start').style.display === 'none';
+function lobbySeat(k) { // click on a slot
+  const S = app.S, st = S?.s?.[k], me = app.myPeer;
+  const nS = (S?.s || []).length;
+  if (k >= nS) { // closed seat: the host can open it
+    if (!amHost()) return toast('Ghế này đang đóng. Host mở thêm ghế trong ⚙️ Cài đặt.');
+    if (A('count', k + 1)) return; hostSetCount(k + 1); return;
+  }
+  if (st && st[0] === 2) { if (st[2] === me) return toast('Bạn đang ngồi ghế này'); return toast('Ghế đã có người'); }
+  // sit here
+  app.mySr = k; app.role = 'play'; app.wv = Date.now();
+  if (app.isHost) { host.hostPlays = true; $('hpPlay').checked = true; hostAssign(app.myPeer, k); return; }
+  if (app.nroom) app.nroom.presence({ want: 'play', wv: app.wv, sr: k }).catch(() => {});
+  if (isAdm()) A('assign', { peer: me, k });
+  toast('Đang vào ghế ' + (k + 1) + '…');
+}
+function lobbySeatType(i, type) {
+  if (A('seat', { i, type })) return;
+  if (!app.isHost) return;
+  host.seats[i] = type === 'bot' ? { type: 'bot', peer: null, name: BOT_NAMES[i] } : { type: 'empty', peer: null, name: '' };
+  hostRebuildLobby(); renderHostPanel(true);
+}
+function renderLobby() {
+  const on = inLobby();
+  document.body.classList.toggle('lobbyMode', on);
+  if (!on) { lobbyKey = ''; return; }
+  const S = app.S, hostMe = amHost(), online = app.mode === 'online';
+  const people = [];
+  people.push({ id: app.myPeer, name: app.name || 'Bạn', want: app.role, ch: myChar, me: true, host: hostMe });
+  if (online) for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer' && p.peer !== 'srv') { const pr = p.presence || {}; people.push({ id: p.peer, name: clean(pr.n, 16) || 'Người chơi', want: pr.want, ch: Number.isInteger(pr.ch) ? pr.ch : -1, host: p.peer === app.hostPeer || (SRVM() && srvPres().ad === p.peer) }); }
+  const c = S.cfg || {}, mapName = (MAP_INFO[S.mp] || {}).name || '';
+  const key = JSON.stringify([S.s, S.mp, c, people, hostMe, app.role, !!app.hostPeer]);
+  if (key === lobbyKey) return; lobbyKey = key;
+  const seated = new Set((S.s || []).filter(s => s && s[0] === 2).map(s => s[2]));
+  $('lbPeopleH').textContent = `👥 Trong phòng (${people.length})`;
+  $('lbPeople').innerHTML = people.map(p => {
+    const k = (S.s || []).findIndex(s => s && s[0] === 2 && s[2] === p.id), ci = p.ch >= 0 && p.ch < SPR.length ? p.ch : (k >= 0 ? charOf(S, k) : -1);
+    return `<div class="lbP${p.me ? ' me' : ''}" data-peer="${esc(p.id)}" ${hostMe ? 'draggable="true"' : ''}>${ci >= 0 && SPR[ci] ? `<img src="${SPR[ci].src}" alt="">` : '<span style="font-size:22px">👤</span>'}<div style="flex:1;min-width:0"><div class="nm">${p.host ? '🎙️ ' : ''}${esc(p.name)}${p.me ? ' (bạn)' : ''}</div><div class="tg">${k >= 0 ? `🎮 Ghế ${k + 1}` : p.want === 'play' ? '⏳ Chờ vào ghế' : '👀 Đang xem'}</div></div></div>`;
+  }).join('');
+  if (hostMe) $('lbPeople').querySelectorAll('.lbP').forEach(el => { el.ondragstart = ev => { ev.dataTransfer.setData('text/plain', el.dataset.peer); }; });
+  const nS = (S.s || []).length;
+  $('lbSlots').innerHTML = [...Array(8).keys()].map(i => {
+    const st = S.s?.[i], col = COLORS[i];
+    if (i >= nS) return `<div class="slot locked" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span><div class="big">🔒</div><div class="st">${hostMe ? 'Bấm để mở ghế' : 'Đang đóng'}</div></div>`;
+    if (!st) return `<div class="slot empty" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span><div class="big">＋</div><div class="sn">Ghế trống</div><div class="st">Bấm để vào</div>${hostMe ? `<div class="sx"><button data-bot="${i}">+ Bot</button></div>` : ''}</div>`;
+    const ci = charOf(S, i), mine = st[0] === 2 && st[2] === app.myPeer;
+    const tag = st[0] === 1 ? '🤖 Bot · bấm để thay chỗ' : mine ? '⭐ Bạn' : '🎮 Người chơi';
+    const tools = hostMe ? `<div class="sx">${st[0] === 2 ? `<button data-out="${i}" title="Mời ra">✕</button>` : `<button data-empty="${i}" title="Bỏ bot">Bỏ bot</button>`}</div>` : '';
+    return `<div class="slot ${st[0] === 1 ? 'bot' : 'human'}${mine ? ' me' : ''}" data-k="${i}" style="--c:${col}"><span class="num">${i + 1}</span>${tools}${SPR[ci] ? `<img src="${SPR[ci].src}" alt="">` : ''}<div class="sn">${esc(st[1] || '')}</div><div class="st">${tag}</div>${st[3] ? `<span class="tr" title="${esc(TRAITS[st[3]]?.[0] || '')}">${traitIcon(st[3])}</span>` : ''}</div>`;
+  }).join('');
+  $('lbSlots').querySelectorAll('.slot').forEach(el => {
+    const k = +el.dataset.k;
+    el.onclick = ev => {
+      const b = ev.target.closest('button');
+      if (b) { ev.stopPropagation(); if (b.dataset.out) hostUnseat(+b.dataset.out); else if (b.dataset.empty) lobbySeatType(+b.dataset.empty, 'empty'); else if (b.dataset.bot) lobbySeatType(+b.dataset.bot, 'bot'); return; }
+      ac(); lobbySeat(k);
+    };
+    if (hostMe) {
+      el.ondragover = ev => { ev.preventDefault(); el.classList.add('over'); };
+      el.ondragleave = () => el.classList.remove('over');
+      el.ondrop = ev => { ev.preventDefault(); el.classList.remove('over'); const peer = ev.dataTransfer.getData('text/plain'); if (!peer || k >= nS) return; if (peer === app.myPeer) lobbySeat(k); else hostAssign(peer, k); };
+    }
+  });
+  const modeTxt = c.mode === 'team' || S.md === 'team' ? 'Chia 2 đội' : 'Đấu đơn';
+  const sizeTxt = { normal: 'bình thường', medium: 'vừa', large: 'siêu lớn' }[c.size || host.size] || '';
+  $('lbInfo').textContent = `🗺️ ${c.map === 'random' || (!c.map && host.mapSel === 'random') ? 'Map ngẫu nhiên' : mapName} · ${modeTxt} · sân ${sizeTxt} · ${nS} ghế`;
+  $('lbStart').style.display = hostMe ? '' : 'none';
+  $('lbSet').style.display = hostMe ? '' : 'none';
+  $('lbHost').style.display = !hostMe && online ? '' : 'none';
+  $('lbInvite').style.display = online && IS_WEB ? '' : 'none';
+  $('lbPlay').classList.toggle('pri', app.role !== 'play');
+}
+$('lbPlay').onclick = () => { ac(); app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bPlay').click(); lobbyKey = ''; };
+$('lbWatch').onclick = () => { app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bWatch').click(); lobbyKey = ''; };
+$('lbChar').onclick = () => openCharPicker();
+$('lbHost').onclick = () => $('bHost').click();
+$('lbSet').onclick = () => { if (amHost()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); } };
+$('lbInvite').onclick = () => $('bInvite').click();
+$('lbStart').onclick = () => { ac(); $('hpStart').click(); };
+setInterval(() => { try { renderLobby(); } catch (e) { console.error(e); } }, 250);
+
 function frame() {
   requestAnimationFrame(frame); // schedule first: one bad frame can never freeze the screen
   const nowMs = performance.now(), dt = Math.min(0.05, Math.max(0, (nowMs - lastFrame) / 1000)); lastFrame = nowMs;
@@ -2429,7 +2584,7 @@ function frame() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, VW, VH);
     try { if (S && S.m) predictStep(S, dt); } catch (e) { PRED.on = false; }
-    if (S && S.m && isFinite(T) && T > 0) { drawBoard(S, dt, now); if (GFX.high) drawVignette(); }
+    if (S && S.m && isFinite(T) && T > 0 && !document.body.classList.contains('lobbyMode')) { drawBoard(S, dt, now); if (GFX.high) drawVignette(); }
   } catch (e) {
     showDrawError(e);
     try { for (let k = 0; k < 20; k++) ctx.restore(); ctx.globalAlpha = 1; } catch (er) { /* ignore */ }
@@ -3802,7 +3957,7 @@ function startHosting() {
   host.hostPlays = app.mode === 'solo' || app.role === 'play';
   $('hpPlay').checked = host.hostPlays;
   hostRebuildLobby();
-  if (app.mode === 'solo') { hostSeatMaintenance(); hostNewGame('pick'); }
+  if (app.mode === 'solo') hostSeatMaintenance(); // wait in the waiting room until the player presses Bắt đầu
   clearInterval(host.timer);
   let last = performance.now();
   const tick = () => {
@@ -3836,14 +3991,14 @@ function hostSeatMaintenance() {
   const pm = peerMap();
   const wanting = [];
   // who wants to play
-  if (host.hostPlays) wanting.push({ peer: app.myPeer, name: app.name || 'Host' });
+  if (host.hostPlays) wanting.push({ peer: app.myPeer, name: app.name || 'Host', sr: app.mySr });
   if (app.mode === 'online') for (const p of app.peers) {
     if (p.sameTab || p.kind !== 'viewer') continue;
     const pr = p.presence || {};
     if (host.forced.has(p.peer) && (pr.wv || 0) !== host.forced.get(p.peer)) host.forced.delete(p.peer); // they pressed Chơi/Xem themselves since
     if (host.forced.has(p.peer)) { wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi' }); continue; }
     if (pr.want !== 'play') host.kicked.delete(p.peer);
-    else if (!host.kicked.has(p.peer)) wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi', auto: true });
+    else if (!host.kicked.has(p.peer)) wanting.push({ peer: p.peer, name: clean(pr.n, 16) || 'Người chơi', auto: true, sr: pr.sr });
   }
   const wantSet = new Set(wanting.map(w => w.peer));
   let changed = false;
@@ -3858,6 +4013,13 @@ function hostSeatMaintenance() {
       if (w && w.name !== s.name) { s.name = w.name; if (g && g.players[i]) g.players[i].name = w.name; changed = true; }
     }
   });
+  if (canSeat) for (const w of wanting) { // someone picked a particular free seat in the waiting room
+    const k = w.sr; if (!Number.isInteger(k) || k < 0 || k >= host.seats.length || host.forced.has(w.peer)) continue;
+    const t = host.seats[k]; if (t.type === 'human') continue;
+    const from = host.seats.findIndex(s => s.type === 'human' && s.peer === w.peer);
+    if (from >= 0) host.seats[from] = { type: 'bot', peer: null, name: BOT_NAMES[from] };
+    host.seats[k] = { type: 'human', peer: w.peer, name: w.name }; changed = true;
+  }
   if (canSeat && host.autoSeat) {
     for (const w of wanting) {
       if (host.seats.some(s => s.type === 'human' && s.peer === w.peer)) continue;
@@ -3888,7 +4050,7 @@ function applySeatToGame(i) {
 // host drags / taps a person into a seat
 function hostAssign(peer, k) {
   if (SRVM()) { A('assign', { peer, k }); return; }
-  if (!app.isHost || k < 0 || k > 3) return;
+  if (!app.isHost || k < 0 || k >= host.seats.length) return;
   const from = host.seats.findIndex(s => s.type === 'human' && s.peer === peer);
   if (from === k) return;
   const target = host.seats[k];
@@ -4238,9 +4400,9 @@ async function enterRoom(role, wantHost, embedRoomName) {
   addFeed(EMBED ? 'Bạn đã vào sân Boom của hội trường.' : 'Bạn đã vào phòng "' + app.code + '". Gửi link trang này cho bạn bè và nhập cùng mã phòng.', 'sys');
   app.nroom.on('feed', msg => { if (typeof msg.data === 'string') addFeed(clean(msg.data, 140), 'sys'); });
   if (SRVM()) {
-    if (wantHost) { await app.nroom.presence({ adm: Date.now() }).catch(() => {}); setTimeout(() => { if (isAdm()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); } }, 800); }
+    if (wantHost) { await app.nroom.presence({ adm: Date.now() }).catch(() => {}); }
     addFeed('🖥️ Đang chơi trên máy chủ riêng: mọi người cùng độ trễ, host tắt máy phòng vẫn chạy.', 'sys');
-  } else if (wantHost) setTimeout(() => { if (!app.hostPeer) { startHosting(); $('hostPanel').style.display = 'block'; } else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
+  } else if (wantHost) setTimeout(() => { if (!app.hostPeer) startHosting(); else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
 }
 function setRole(role) {
   app.role = role; app.wv = Date.now();
@@ -4312,7 +4474,7 @@ $('sSolo').onclick = () => {
   app.mode = 'solo'; app.role = 'play'; app.myPeer = 'local';
   $('start').style.display = 'none'; $('roomTag').textContent = 'Chơi với máy'; firstHelp();
   startHosting();
-  addFeed('Chơi với 3 bot. Mở ⚙️ để chọn tới 8 người, chia đội, số Ông Mây Giông.', 'sys');
+  addFeed('Sảnh chờ: bấm vào ô ghế để ngồi, ⚙️ Cài đặt để chọn map, số người (tới 8), chia đội, số Ông Mây Giông. Xong bấm ▶ Bắt đầu.', 'sys');
 };
 ['sName', 'sRoom'].forEach(id => $(id).addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !$('sPlay').disabled) $('sPlay').click(); }));
 

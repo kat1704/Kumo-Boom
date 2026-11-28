@@ -1031,7 +1031,7 @@ class RoomHost {
       if (this.forced.has(pe.id) && (pr.wv || 0) !== this.forced.get(pe.id)) this.forced.delete(pe.id);
       if (this.forced.has(pe.id)) { wanting.push({ peer: pe.id, name: clean(pr.n, 16) || 'Người chơi' }); continue; }
       if (pr.want !== 'play') this.kicked.delete(pe.id);
-      else if (!this.kicked.has(pe.id)) wanting.push({ peer: pe.id, name: clean(pr.n, 16) || 'Người chơi' });
+      else if (!this.kicked.has(pe.id)) wanting.push({ peer: pe.id, name: clean(pr.n, 16) || 'Người chơi', sr: pr.sr });
     }
     const wantSet = new Set(wanting.map(w => w.peer));
     let changed = false;
@@ -1045,6 +1045,13 @@ class RoomHost {
         if (w && w.name !== s.name) { s.name = w.name; if (g && g.players[i]) g.players[i].name = w.name; changed = true; }
       }
     });
+    if (canSeat) for (const w of wanting) { // a player picked a particular free seat in the waiting room
+      const k = w.sr; if (!Number.isInteger(k) || k < 0 || k >= this.seats.length || this.forced.has(w.peer)) continue;
+      if (this.seats[k].type === 'human') continue;
+      const from = this.seats.findIndex(s => s.type === 'human' && s.peer === w.peer);
+      if (from >= 0) this.seats[from] = { type: 'bot', peer: null, name: BOT_NAMES[from] };
+      this.seats[k] = { type: 'human', peer: w.peer, name: w.name }; changed = true;
+    }
     if (canSeat && this.autoSeat) for (const w of wanting) {
       if (this.seats.some(s => s.type === 'human' && s.peer === w.peer)) continue;
       let k = this.seats.findIndex(s => s.type === 'empty'); if (k < 0) k = this.seats.findIndex(s => s.type === 'bot'); if (k < 0) break;

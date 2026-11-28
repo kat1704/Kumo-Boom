@@ -457,6 +457,7 @@ body.vig #vig{display:block;background:radial-gradient(ellipse at center,rgba(0,
     <button id="bGuide" title="Ẩn / hiện các bảng hướng dẫn">📖</button>
     <button id="bGfx" title="Chất lượng đồ họa">✨ Cao</button>
     <button id="bHelp" title="Hướng dẫn nút bấm (H)">❓</button>
+    <button id="bMusic" title="Tắt nhạc nền">🎵</button>
     <button id="bTts" title="Đọc bình luận bằng giọng nói">🔇</button>
     <button id="chatToggle" style="display:none">💬</button>
 
@@ -4692,57 +4693,78 @@ $('sSolo').onclick = () => {
 };
 ['sName', 'sRoom'].forEach(id => $(id).addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !$('sPlay').disabled) $('sPlay').click(); }));
 
-// ===================== loading screen + cheerful chiptune =====================
-(function splash() {
-  const el = document.getElementById('splash'); if (!el || EMBED || window.__noSplash) { if (el) el.remove(); return; }
-  const DUR = 7000, t0 = performance.now();
-  let music = null;
-  // a bright pentatonic tune (C major pentatonic, Japanese-festival feel) on square + triangle with a soft beat
-  function startMusic() {
-    if (music) return;
+// ===================== background music: a cheerful festival chiptune, quieter during matches =====================
+const BGM = (() => {
+  let out = null, alive = false, on = (() => { try { return localStorage.getItem('boom.music') !== 'off'; } catch (e) { return true; } })(), level = 0.5;
+  const N = n => 440 * Math.pow(2, (n - 69) / 12);
+  const A1 = [76,79,81,84, 81,79,76,74, 72,74,76,79, 76,74,72,0, 76,79,81,84, 86,84,81,79, 81,79,76,74, 72,0,72,0];
+  const B1 = [84,86,88,86, 84,81,79,81, 84,0,81,79, 76,79,81,0, 79,81,84,86, 88,86,84,81, 79,76,74,76, 72,0,0,0];
+  const bA = [48,48,55,55, 53,53,55,55, 48,48,55,55, 53,55,48,48], bB = [45,45,52,52, 41,41,48,48, 43,43,50,50, 48,43,48,48];
+  const SONG = [[A1, bA], [A1, bA], [B1, bB], [A1, bA]];
+  const step = 0.17;
+  function start() {
+    if (alive || !on) return;
     const A = ac(); if (!A || A.state !== 'running') return;
-    const out = A.createGain(); out.gain.value = 0.0001; out.connect(A.destination);
-    out.gain.exponentialRampToValueAtTime(0.5, A.currentTime + 0.4);
-    const N = n => 440 * Math.pow(2, (n - 69) / 12);
-    const mel = [76,79,81,84, 81,79,76,74, 72,74,76,79, 76,74,72,0, 76,79,81,84, 86,84,81,79, 81,79,76,74, 72,0,72,0];
-    const bass = [48,48,55,55, 53,53,55,55, 48,48,55,55, 53,55,48,48];
-    const step = 0.17, loopLen = mel.length * step;
+    alive = true;
+    out = A.createGain(); out.gain.value = 0.0001; out.connect(A.destination);
+    out.gain.setTargetAtTime(level, A.currentTime, 0.3);
     const note = (f, t, d, type, vol) => {
       const o = A.createOscillator(), g = A.createGain(); o.type = type; o.frequency.value = f;
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
       o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.02);
     };
-    const hat = t => { const b = A.createBuffer(1, A.sampleRate * 0.04, A.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length); const s = A.createBufferSource(), g = A.createGain(), f = A.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000; g.gain.value = 0.12; s.buffer = b; s.connect(f); f.connect(g); g.connect(out); s.start(t); };
+    let noiseBuf = null;
+    const hat = t => { if (!noiseBuf) { noiseBuf = A.createBuffer(1, A.sampleRate * 0.04, A.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length); } const s = A.createBufferSource(), g = A.createGain(), f = A.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000; g.gain.value = 0.12; s.buffer = noiseBuf; s.connect(f); f.connect(g); g.connect(out); s.start(t); };
     const kick = t => { const o = A.createOscillator(), g = A.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.16); };
-    let next = A.currentTime + 0.05, alive = true;
+    let next = A.currentTime + 0.05, part = 0;
     const sched = () => {
       if (!alive) return;
-      while (next < A.currentTime + 0.6) {
+      while (next < A.currentTime + 0.8) { // schedule one 32-step phrase at a time
+        const [mel, bass] = SONG[part % SONG.length]; part++;
         for (let i = 0; i < mel.length; i++) {
           const t = next + i * step;
           if (mel[i]) { note(N(mel[i]), t, step * 0.9, 'square', 0.09); note(N(mel[i] + 12), t, step * 0.5, 'triangle', 0.04); }
           if (i % 2 === 0) note(N(bass[i / 2]), t, step * 1.8, 'triangle', 0.22);
           if (i % 4 === 0) kick(t); if (i % 2 === 1) hat(t);
         }
-        next += loopLen;
+        next += mel.length * step;
       }
-      setTimeout(sched, 200);
+      setTimeout(sched, 250);
     };
     sched();
-    music = { stop: () => { alive = false; try { out.gain.setTargetAtTime(0.0001, A.currentTime, 0.5); setTimeout(() => out.disconnect(), 2500); } catch (e) { /* ignore */ } } };
     const tip = document.getElementById('spTap'); if (tip) tip.style.display = 'none';
   }
-  const tryStart = () => { const A = ac(); if (A && A.state !== 'running') A.resume().then(startMusic).catch(() => {}); else startMusic(); };
-  tryStart(); setTimeout(tryStart, 300);
-  ['pointerdown', 'keydown', 'touchstart'].forEach(k => window.addEventListener(k, tryStart, { once: false, passive: true }));
+  function stop() { if (!alive) return; alive = false; const A = ac(), o = out; try { o.gain.setTargetAtTime(0.0001, A.currentTime, 0.25); setTimeout(() => o.disconnect(), 1500); } catch (e) { /* ignore */ } out = null; }
+  function setLevel(v) { if (Math.abs(v - level) < 0.001) return; level = v; if (out) { const A = ac(); out.gain.setTargetAtTime(Math.max(0.0001, v), A.currentTime, 0.6); } }
+  function toggle() { on = !on; try { localStorage.setItem('boom.music', on ? 'on' : 'off'); } catch (e) { /* ignore */ } if (on) { const A = ac(); if (A && A.state !== 'running') A.resume().then(start).catch(() => {}); else start(); } else stop(); return on; }
+  // browsers only allow sound after the first tap/key
+  const kick = () => { if (on && !alive) { const A = ac(); if (A && A.state !== 'running') A.resume().then(start).catch(() => {}); else start(); } };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(k => window.addEventListener(k, kick, { passive: true }));
+  return { start: kick, setLevel, toggle, get on() { return on; } };
+})();
+// louder in menus and the waiting room, softer (but still there) during a match
+setInterval(() => {
+  const ph = app.S && app.S.ph, inMatch = !!app.mode && $('start').style.display === 'none' && !document.body.classList.contains('lobbyMode') && ph && ph !== 'lobby';
+  BGM.setLevel(inMatch ? 0.16 : 0.5);
+}, 400);
+if ($('bMusic')) {
+  const syncMusicBtn = () => { $('bMusic').textContent = BGM.on ? '🎵' : '🔕'; $('bMusic').title = BGM.on ? 'Tắt nhạc nền' : 'Bật nhạc nền'; };
+  $('bMusic').onclick = () => { const v = BGM.toggle(); syncMusicBtn(); toast(v ? '🎵 Đã bật nhạc nền' : '🔕 Đã tắt nhạc nền'); };
+  syncMusicBtn();
+}
+
+// ===================== loading screen =====================
+(function splash() {
+  BGM.start(); setTimeout(BGM.start, 300);
+  const el = document.getElementById('splash'); if (!el || EMBED || window.__noSplash) { if (el) el.remove(); return; }
+  const DUR = 7000, t0 = performance.now();
   const fill = document.getElementById('spFill');
   const tick = () => {
     const u = Math.min(1, (performance.now() - t0) / DUR);
     fill.style.clipPath = `inset(0 ${(100 - 100 * (1 - Math.pow(1 - u, 1.6))).toFixed(1)}% 0 0 round 99px)`;
     if (u < 1) return requestAnimationFrame(tick);
     el.classList.add('out');
-    ['pointerdown', 'keydown', 'touchstart'].forEach(k => window.removeEventListener(k, tryStart));
-    setTimeout(() => { el.remove(); if (music) music.stop(); }, 1500); // the tune lingers a moment and fades on the start screen
+    setTimeout(() => el.remove(), 1500);
   };
   requestAnimationFrame(tick);
 })();

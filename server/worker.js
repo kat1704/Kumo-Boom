@@ -1175,8 +1175,9 @@ export class BoomRoom {
   pickAdmin() {
     let best = null;
     for (const [id, c] of this.conns) {
-      const claim = typeof c.p.adm === 'number' ? c.p.adm : Infinity;
-      if (!best || claim < best.claim || (claim === best.claim && c.joined < best.joined)) best = { id, claim, joined: c.joined };
+      // claimers first (smallest claim wins), then people with no claim, last those who gave host up ('no')
+      const rank = typeof c.p.adm === 'number' ? 0 : c.p.adm === 'no' ? 2 : 1, claim = rank === 0 ? c.p.adm : 0;
+      if (!best || rank < best.rank || (rank === best.rank && (claim < best.claim || (claim === best.claim && c.joined < best.joined)))) best = { id, rank, claim, joined: c.joined };
     }
     const ad = best ? best.id : '';
     if (ad !== this.srv.ad) this.srvSet({ ad });

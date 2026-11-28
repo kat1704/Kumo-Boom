@@ -321,6 +321,10 @@ body.lobbyMode #left,body.lobbyMode #center,body.lobbyMode #keyHint,body.lobbyMo
 body.lobbyMode{background:radial-gradient(ellipse at 50% 30%,#19344b,#0b1720)}
 .lbTools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .lbTools button{font-size:15px;padding:8px 14px}
+#lbReq{display:flex;flex-direction:column;gap:6px}
+.hreq{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(255,211,107,.15);border:1px solid #ffd36b;font-size:15px}
+.hreq b{color:#ffd36b}.hreq button{padding:5px 12px;font-size:14px}
+.hreq button.pri{margin-left:auto}
 #lbStart{margin-left:auto;font-size:17px;padding:9px 22px;background:linear-gradient(180deg,#ffd36b,#e0a020);color:#2a1a00;border-color:#b07a10}
 #lbInfo{font-size:13.5px;color:var(--mut)}
 .lbBody{flex:1;display:flex;gap:12px;min-height:0}
@@ -486,6 +490,7 @@ body.lobbyMode #bPlay,body.lobbyMode #bWatch,body.lobbyMode #bHost,body.lobbyMod
     <span id="lbInfo"></span>
     <button id="lbStart" class="pri">▶ Bắt đầu</button>
   </div>
+  <div id="lbReq" style="display:none"></div>
   <div class="lbBody">
     <div class="lbPeople"><div class="sect" id="lbPeopleH">👥 Trong phòng</div><div id="lbPeople"></div></div>
     <div id="lbSlots"></div>
@@ -2593,7 +2598,7 @@ function renderLobby() {
   people.push({ id: app.myPeer, name: app.name || 'Bạn', want: app.role, ch: myChar, me: true, host: hostMe, rd: !!myReady });
   if (online) for (const p of app.peers) if (!p.sameTab && p.kind === 'viewer' && p.peer !== 'srv') { const pr = p.presence || {}; people.push({ id: p.peer, name: clean(pr.n, 16) || 'Người chơi', want: pr.want, ch: Number.isInteger(pr.ch) ? pr.ch : -1, rd: pr.rd > 0, host: p.peer === app.hostPeer || (SRVM() && srvPres().ad === p.peer) }); }
   const c = S.cfg || {}, mapName = (MAP_INFO[S.mp] || {}).name || '';
-  const key = JSON.stringify([S.s, S.mp, c, people, hostMe, app.role, !!app.hostPeer, myChar, myTrait, myReady]);
+  const key = JSON.stringify([S.s, S.mp, c, people, hostMe, app.role, !!app.hostPeer, myChar, myTrait, myReady, hostActive(), [...hostReqs.keys()], myHostReqAt && Date.now() - myHostReqAt < 15000, SRVM() && srvPres().ad]);
   if (key === lobbyKey) return; lobbyKey = key;
   const seated = new Set((S.s || []).filter(s => s && s[0] === 2).map(s => s[2]));
   $('lbPeopleH').textContent = `👥 Trong phòng (${people.length})`;
@@ -2632,7 +2637,13 @@ function renderLobby() {
   $('lbInfo').textContent = `🗺️ ${c.map === 'random' || (!c.map && host.mapSel === 'random') ? 'Map ngẫu nhiên' : mapName} · ${modeTxt} · sân ${sizeTxt} · ${nS} ghế`;
   $('lbStart').style.display = hostMe ? '' : 'none';
   $('lbSet').style.display = hostMe ? '' : 'none';
-  $('lbHost').style.display = !hostMe && online ? '' : 'none';
+  $('lbHost').style.display = online ? '' : 'none';
+  const active = hostActive();
+  $('lbHost').textContent = hostMe ? '🚪 Bỏ làm host' : active ? (myHostReqAt && Date.now() - myHostReqAt < 15000 ? '⏳ Đã xin làm host' : '🙋 Xin làm host') : '👑 Nhận host';
+  $('lbHost').title = hostMe ? 'Nhường quyền host cho người khác' : active ? 'Gửi lời xin host hiện tại cho bạn làm host' : 'Phòng chưa có host, bấm để làm host';
+  for (const [k, v] of hostReqs) if (!app.peers.some(p => p.peer === k) || Date.now() - v.t > 60000) hostReqs.delete(k);
+  $('lbReq').style.display = hostMe && hostReqs.size ? '' : 'none';
+  $('lbReq').innerHTML = [...hostReqs].map(([k, v]) => `<div class="hreq">🙋 <b>${esc(v.name)}</b> xin làm host <button class="pri" data-peer="${esc(k)}" data-ok="1">✔ Đồng ý</button><button data-peer="${esc(k)}" data-ok="0">✖ Từ chối</button></div>`).join('');
   $('lbPlay').style.display = (S.s || []).some(s => s && s[0] === 2 && s[2] === app.myPeer) ? 'none' : '';
   $('lbInvite').style.display = online && IS_WEB ? '' : 'none';
   $('lbPlay').classList.toggle('pri', app.role !== 'play');
@@ -2655,17 +2666,69 @@ $('lbReady').onclick = () => { ac(); setReady(!myReady); toast(myReady ? '✅ Đ
 $('lbPlay').onclick = () => { ac(); app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bPlay').click(); lobbyKey = ''; };
 $('lbWatch').onclick = () => { app.mySr = undefined; if (app.nroom) app.nroom.presence({ sr: null }).catch(() => {}); $('bWatch').click(); lobbyKey = ''; };
 $('lbChar').onclick = () => openCharPicker();
+// ---- host hand-over: request / give up / take
+const hostReqs = new Map(); // peer -> { name, t } (requests waiting for the host's answer)
+let myHostReqAt = 0;
+function hostActive() {
+  if (SRVM()) { const ad = srvPres().ad; return !!ad && ad !== app.myPeer && app.peers.some(p => p.peer === ad); }
+  return !!app.hostPeer && !app.isHost && performance.now() - app.lastStateAt < 4000;
+}
+function hostName() {
+  const id = SRVM() ? srvPres().ad : app.hostPeer; if (!id) return 'host';
+  return clean(app.peers.find(p => p.peer === id)?.presence?.n, 16) || 'host';
+}
+function takeHost() {
+  if (SRVM()) { app.nroom.presence({ adm: -Date.now() }).catch(() => {}); setTimeout(() => { if (isAdm()) { toast('👑 Bạn đã là host'); lobbyKey = ''; } }, 700); return; }
+  startHosting(); toast('👑 Bạn đã là host'); lobbyKey = '';
+}
+function giveUpHost(to) { // to: peer to hand over to (optional)
+  if (!amHost()) return;
+  if (to && app.nroom) app.nroom.emit('hgive', { to }).catch(() => {});
+  if (SRVM()) { app.nroom.presence({ adm: 'no' }).catch(() => {}); }
+  else {
+    if (!to) { // pick someone else in the room to carry on
+      const other = app.peers.find(p => !p.sameTab && p.kind === 'viewer' && p.peer !== 'srv');
+      if (other) { to = other.peer; app.nroom.emit('hgive', { to }).catch(() => {}); }
+    }
+    stopHosting();
+  }
+  hostReqs.clear(); lobbyKey = '';
+  toast(to ? '🚪 Đã chuyển quyền host cho ' + peerName(to) : '🚪 Bạn đã bỏ làm host');
+}
+function setupHostHandover() {
+  app.nroom.on('hreq', msg => {
+    if (msg.sameTab || !amHost()) return;
+    const name = clean(app.peers.find(p => p.peer === msg.peer)?.presence?.n, 16) || 'Ai đó';
+    hostReqs.set(msg.peer, { name, t: Date.now() }); lobbyKey = '';
+    toast('🙋 ' + name + ' xin làm host (trả lời trong phòng chờ)', 3500); tone(660, 990, 0.15, 'sine', 0.06);
+  });
+  app.nroom.on('hdeny', msg => { if (msg.data?.to === app.myPeer) { myHostReqAt = 0; lobbyKey = ''; toast('Host đã từ chối cho bạn làm host'); } });
+  app.nroom.on('hgive', msg => {
+    if (msg.sameTab || msg.data?.to !== app.myPeer) return;
+    const fromHost = SRVM() ? srvPres().ad === msg.peer : app.hostPeer === msg.peer || !hostActive();
+    if (!fromHost) return;
+    myHostReqAt = 0;
+    if (SRVM()) takeHost(); else setTimeout(() => { if (!app.isHost) takeHost(); }, 900);
+    addFeed('👑 Bạn được giao quyền host', 'sys');
+  });
+}
+function answerHostReq(peer, ok) {
+  hostReqs.delete(peer); lobbyKey = '';
+  if (!app.nroom) return;
+  if (ok) giveUpHost(peer); else app.nroom.emit('hdeny', { to: peer }).catch(() => {});
+}
 $('lbHost').onclick = () => {
   ac();
-  if (amHost()) return toast('Bạn đang là host rồi');
-  if (SRVM()) { // newest claim wins on the server
-    app.nroom.presence({ adm: -Date.now() }).catch(() => {});
-    setTimeout(() => toast(isAdm() ? '👑 Bạn đã nhận quyền host' : 'Chưa nhận được host, thử lại nhé'), 700);
-    return;
+  if (amHost()) return giveUpHost();
+  if (hostActive()) {
+    if (myHostReqAt && Date.now() - myHostReqAt < 15000) return toast('Đã gửi lời xin, chờ host trả lời nhé');
+    myHostReqAt = Date.now(); lobbyKey = '';
+    app.nroom.emit('hreq', { n: app.name }).catch(() => {});
+    return toast('🙋 Đã xin ' + hostName() + ' cho làm host');
   }
-  if (app.hostPeer && performance.now() - app.lastStateAt < 4000) return toast('Phòng đang có host chạy trận. Nhờ host bấm "Thôi host" rồi bạn bấm Nhận host.');
-  startHosting(); toast('👑 Bạn đã nhận quyền host');
+  return takeHost();
 };
+$('lbReq').addEventListener('click', ev => { const b = ev.target.closest('button[data-peer]'); if (b) answerHostReq(b.dataset.peer, b.dataset.ok === '1'); });
 $('lbSet').onclick = () => { if (amHost()) { $('hostPanel').style.display = 'block'; renderHostPanel(true); } };
 $('lbInvite').onclick = () => $('bInvite').click();
 $('lbStart').onclick = () => { ac(); $('hpStart').click(); };
@@ -4526,11 +4589,12 @@ async function enterRoom(role, wantHost, embedRoomName, autoHost) {
   if (IS_WEB) { try { history.replaceState(null, '', '#' + app.code); } catch (e) { /* ignore */ } $('bInvite').style.display = ''; showInvite(); addFeed('🔗 Link mời: ' + inviteLink() + ' — bạn bè mở link này là vào đúng phòng.', 'sys'); }
   addFeed(EMBED ? 'Bạn đã vào sân Boom của hội trường.' : 'Bạn đã vào phòng "' + app.code + '". Gửi link trang này cho bạn bè và nhập cùng mã phòng.', 'sys');
   app.nroom.on('feed', msg => { if (typeof msg.data === 'string') addFeed(clean(msg.data, 140), 'sys'); });
+  setupHostHandover();
   if (SRVM()) {
     if (wantHost) { await app.nroom.presence({ adm: Date.now() }).catch(() => {}); }
     addFeed('🖥️ Đang chơi trên máy chủ riêng: mọi người cùng độ trễ, host tắt máy phòng vẫn chạy.', 'sys');
   } else if (wantHost) setTimeout(() => { if (!app.hostPeer) startHosting(); else toast('Phòng đã có host — bạn vào xem.'); }, 1200);
-  else if (autoHost) setTimeout(() => { if (!app.hostPeer && !app.isHost && !(performance.now() - app.lastStateAt < 3000)) { startHosting(); addFeed('👑 Phòng chưa có ai, bạn đang giữ quyền host. Ai muốn nhận host thì bấm 👑 Nhận host.', 'sys'); } }, 1800);
+  else if (autoHost) setTimeout(() => { if (!app.hostPeer && !app.isHost && !(performance.now() - app.lastStateAt < 3000)) { startHosting(); addFeed('👑 Phòng chưa có ai, bạn đang giữ quyền host. Ai muốn làm host thì bấm 🙋 Xin làm host.', 'sys'); } }, 1800);
 }
 function setRole(role) {
   app.role = role; app.wv = Date.now();

@@ -456,7 +456,6 @@ body.lobbyMode #bPlay,body.lobbyMode #bWatch,body.lobbyMode #bHost,body.lobbyMod
     <select id="hpMode"><option value="ffa">Đấu đơn (mỗi người một phe)</option><option value="team">Chia 2 đội (ghế lẻ vs ghế chẵn)</option></select>
   </div>
   <div class="row"><label><input type="checkbox" id="hpPlay"> Host cũng vào chơi</label>
-    <label><input type="checkbox" id="hpAuto" checked> Tự sang ván mới</label>
     <label><input type="checkbox" id="hpAutoCm" checked> Bình luận tự động</label>
   </div>
   <div class="row">
@@ -729,7 +728,7 @@ const SIM = (() => {
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0, stun: 0, wet: 0,
-        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, // everyone starts with 1 needle; the needle trait gives a second one kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
+        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, /* everyone starts with 1 needle, the needle trait gives a second */ kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
       });
@@ -3665,7 +3664,7 @@ function updateCenter(S, now) {
       }
       const rows = seatIdx(S).filter(i => S.s?.[i]).sort((a, b) => (S.sc?.[b] || 0) - (S.sc?.[a] || 0));
       const board = `<div class="sboard">${rows.map((i, k) => `<div class="sbr"><span>${(['🥇', '🥈', '🥉'][k] || (k + 1) + '.')}</span>${SPR[charOf(S, i)] ? `<img class="sbi" src="${SPR[charOf(S, i)].src}" alt="">` : `<span class="sd" style="background:${COLORS[i]}"></span>`}<b>${esc(seatName(S, i))}<small> · ${CHAR_NAMES[charOf(S, i)]}</small></b><i>💥${S.p?.[i]?.[8] ?? 0}${S.wn >= 0 && S.p?.[i] && S.p[i][11] === S.wn ? ' · 🏆 +2' : ''}</i><em>⭐ ${S.sc?.[i] || 0}</em></div>`).join('')}<div class="sbn">Hạ gục +1 điểm · Thắng ván +2 điểm</div></div>`;
-      h = `<div class="res">${t}</div>${board}<div class="sm">${S.auto ? 'Ván mới sau ' + Math.max(0, Math.ceil(S.t)) + ' giây…' : 'Chờ host mở ván mới'}</div>`;
+      h = `<div class="res">${t}</div>${board}<div class="sm">Về phòng chờ sau ${Math.max(0, Math.ceil(S.t))} giây…</div>`;
     }
   }
   if (c._h !== h) { c._h = h; c.innerHTML = h; c.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { ac(); setTrait(b.dataset.pick); }); const rb = c.querySelector('[data-resume]'); if (rb) rb.onclick = () => togglePause(); const cb = c.querySelector('[data-copyinv]'); if (cb) cb.onclick = () => $('inviteCopy').click(); }
@@ -4142,8 +4141,7 @@ function hostTick(dt) {
   } else SIM.step(g, dt, inputs);
   host.evId = g.evId; g.wins.forEach((v, i) => { host.wins[i] = v; }); g.score.forEach((v, i) => { host.score[i] = v; });
   if (g.phase === 'end' && g.t <= 0) {
-    if (host.auto) { hostSeatMaintenance(); hostNewGame('pick'); }
-    else { host.seed = (Math.random() * 1e9) | 0; host.curMap = pickMap(); hostRebuildLobby(); }
+    { host.seed = (Math.random() * 1e9) | 0; host.curMap = pickMap(); hostRebuildLobby(); }
   }
   host.tick++;
   const snap = SIM.encode(host.g);
@@ -4219,7 +4217,7 @@ function roomPeople() {
 function renderHostPanel(force) {
   if (!amHost()) return;
   if (SRVM()) mirrorServerHost();
-  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; if (document.activeElement !== $('hpNpcN')) $('hpNpcN').value = host.npcN; $('hpCount').value = host.nSeats; $('hpAuto').checked = host.auto; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
+  $('hpMode').value = host.mode; $('hpMap').value = host.mapSel; $('hpSize').value = host.size; if (document.activeElement !== $('hpNpcN')) $('hpNpcN').value = host.npcN; $('hpCount').value = host.nSeats; $('hpAutoCm').checked = host.autoCm; $('hpPlay').checked = host.hostPlays; $('hpAutoSeat').checked = host.autoSeat;
   const people = roomPeople();
   const key = JSON.stringify([host.seats, people, host.pick]);
   if (!force && (key === hpKey || hpDragging)) return;
@@ -4277,7 +4275,6 @@ function renderHostPanel(force) {
 }
 setInterval(() => { if (amHost() && $('hostPanel').style.display === 'block') renderHostPanel(); }, 400);
 $('hpMode').onchange = () => { if (A('mode', $('hpMode').value)) return; host.mode = $('hpMode').value; if (host.g.phase === 'lobby' || host.g.phase === 'end') hostRebuildLobby(); else toast('Chế độ mới áp dụng từ ván sau'); };
-$('hpAuto').onchange = () => { if (A('auto', $('hpAuto').checked)) return; host.auto = $('hpAuto').checked; };
 $('hpNpcN').onchange = () => {
   const n = Math.max(0, Math.min(10, Math.round(+$('hpNpcN').value || 0))); $('hpNpcN').value = n;
   if (A('npcN', n)) return;
@@ -4574,7 +4571,7 @@ if (EMBED) {
 window.addEventListener('resize', layout);
 layout();
 requestAnimationFrame(frame);
-window.__boom = { app, host, SIM, R, visibility, PRED, SPR };
+window.__boom = { app, host, SIM, R, visibility, PRED, SPR, hostTick };
 return api;
 }
 

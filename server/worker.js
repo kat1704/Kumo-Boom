@@ -149,7 +149,7 @@ const SIM = (() => {
         team: cfg.mode === 'team' ? (s % 2 === 0 ? 0 : 1) : s,
         x: SPAWNS[s][0], y: SPAWNS[s][1], dir: SPAWNS[s][1] > H / 2 ? 1 : 0,
         st: 0, trapT: 0, inv: 0, moving: 0, stun: 0, wet: 0,
-        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, // everyone starts with 1 needle; the needle trait gives a second one kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
+        maxBombs: pc.trait === 'b' ? 2 : 1, fire: pc.trait === 'f' ? 2 : 1, spd: pc.trait === 's' ? 1 : 0, needles: pc.trait === 'n' ? 2 : 1, /* everyone starts with 1 needle, the needle trait gives a second */ kills: 0, kick: 0, thr: 0, trait: pc.trait || '', pw: 0,
         ghost: new Set(), ai: { wander: null, cool: 0 }, tpCd: 0, trapBy: -1,
         _b: false, _n: false,
       });
@@ -1128,8 +1128,7 @@ class RoomHost {
     g = this.g;
     this.evId = g.evId; g.wins.forEach((v, i) => { this.wins[i] = v; }); g.score.forEach((v, i) => { this.score[i] = v; });
     if (g.phase === 'end' && g.t <= 0) {
-      if (this.auto) { this.seatMaintenance(); this.newGame('pick'); }
-      else { this.seed = (Math.random() * 1e9) | 0; this.curMap = this.pickMap(); this.rebuildLobby(); }
+      { this.seed = (Math.random() * 1e9) | 0; this.curMap = this.pickMap(); this.rebuildLobby(); }
     }
   }
   dims() { const d = SIM.SIZES[this.g.__size] || SIM.SIZES.normal; if (SIM.W !== d[0] || SIM.H !== d[1]) SIM.setDims(this.g.__size); } // another room in this process may have changed the size

@@ -1129,7 +1129,7 @@ class RoomHost {
   snapshot() {
     this.tick++; this.dims();
     const g = this.g, snap = SIM.encode(g);
-    const chOf = peer => { const v = this.peer(peer)?.p?.ch; return Number.isInteger(v) && v >= -1 && v < 16 ? v : -1; };
+    const chOf = peer => { const v = this.peer(peer)?.p?.ch; return Number.isInteger(v) && v >= -1 && v < 32 ? v : -1; };
     snap.s = this.seats.map((s, i) => s.type === 'empty' ? 0 : [s.type === 'bot' ? 1 : 2, s.name, s.peer || '', g.players[i]?.trait || '', s.type === 'human' ? chOf(s.peer) : -1]);
     snap.rk = this.rk; snap.auto = this.auto ? 1 : 0; snap.pz = this.paused ? 1 : 0; snap.k = this.tick;
     snap.cfg = { mode: this.mode, map: this.mapSel, size: this.size, npc: this.npcN > 0 ? 1 : 0, npcN: this.npcN, auto: this.auto ? 1 : 0, autoCm: this.autoCm ? 1 : 0, autoSeat: this.autoSeat ? 1 : 0 };
